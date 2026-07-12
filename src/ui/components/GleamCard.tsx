@@ -1,35 +1,35 @@
-import { useState } from 'preact/hooks';
-import styled from '@emotion/styled';
-import { Gleam } from '../../domain/gleam';
-import { theme } from '../theme';
+import { useState } from 'preact/hooks'
+import styled from '@emotion/styled'
+import { Gleam } from '../../domain/gleam'
+import { theme } from '../theme'
 
 interface GleamCardProps {
-  gleam: Gleam;
-  onDelete: (id: string) => void;
-  onRevisit: (id: string) => void;
+  gleam: Gleam
+  onDelete: (id: string) => void
+  onRevisit: (id: string) => void
 }
 
 export function GleamCard({ gleam, onDelete, onRevisit }: GleamCardProps) {
-  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
 
   const getFormattedTime = (isoString: string) => {
-    const d = new Date(isoString);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+    const d = new Date(isoString)
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
 
   const getSourceHost = (url?: string) => {
-    if (!url) return '';
+    if (!url) return ''
     try {
-      return new URL(url).hostname;
+      return new URL(url).hostname
     } catch {
-      return '';
+      return ''
     }
-  };
+  }
 
   const handleCardClick = () => {
     // Record this revisit in the background
-    onRevisit(gleam.id);
-  };
+    onRevisit(gleam.id)
+  }
 
   return (
     <Card onClick={handleCardClick}>
@@ -41,21 +41,21 @@ export function GleamCard({ gleam, onDelete, onRevisit }: GleamCardProps) {
               👁 {gleam.revisit_count}
             </RevisitBadge>
           ) : null}
-          
+
           {showConfirmDelete ? (
             <ConfirmDeleteGroup>
               <ConfirmDeleteBtn
                 onClick={(e: MouseEvent) => {
-                  e.stopPropagation();
-                  onDelete(gleam.id);
+                  e.stopPropagation()
+                  onDelete(gleam.id)
                 }}
               >
                 确认
               </ConfirmDeleteBtn>
               <CancelDeleteBtn
                 onClick={(e: MouseEvent) => {
-                  e.stopPropagation();
-                  setShowConfirmDelete(false);
+                  e.stopPropagation()
+                  setShowConfirmDelete(false)
                 }}
               >
                 取消
@@ -65,8 +65,8 @@ export function GleamCard({ gleam, onDelete, onRevisit }: GleamCardProps) {
             <DeleteIconButton
               title="删除此条拾光"
               onClick={(e: MouseEvent) => {
-                e.stopPropagation();
-                setShowConfirmDelete(true);
+                e.stopPropagation()
+                setShowConfirmDelete(true)
               }}
             >
               <svg viewBox="0 0 24 24">
@@ -79,11 +79,7 @@ export function GleamCard({ gleam, onDelete, onRevisit }: GleamCardProps) {
 
       <ThoughtText>{gleam.thought}</ThoughtText>
 
-      {gleam.source.excerpt && (
-        <SourceExcerpt>
-          “ {gleam.source.excerpt} ”
-        </SourceExcerpt>
-      )}
+      {gleam.source.excerpt && <SourceExcerpt>“ {gleam.source.excerpt} ”</SourceExcerpt>}
 
       {gleam.source.url && (
         <SourceFooter>
@@ -102,9 +98,8 @@ export function GleamCard({ gleam, onDelete, onRevisit }: GleamCardProps) {
           <SourceHost>{getSourceHost(gleam.source.url)}</SourceHost>
         </SourceFooter>
       )}
-
     </Card>
-  );
+  )
 }
 
 const Card = styled.div`
@@ -137,25 +132,25 @@ const Card = styled.div`
     background: ${theme.colors.brand.primary};
     opacity: 0.8;
   }
-`;
+`
 
 const CardHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-`;
+`
 
 const TimeLabel = styled.span`
   font-size: 11px;
   color: ${theme.colors.text.muted};
   font-weight: 500;
-`;
+`
 
 const HeaderActions = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
-`;
+`
 
 const RevisitBadge = styled.span`
   font-size: 11px;
@@ -163,12 +158,12 @@ const RevisitBadge = styled.span`
   padding: 2px 6px;
   border-radius: 4px;
   color: ${theme.colors.text.muted};
-`;
+`
 
 const ConfirmDeleteGroup = styled.div`
   display: flex;
   gap: 4px;
-`;
+`
 
 const ConfirmDeleteBtn = styled.button`
   background: hsl(0, 75%, 45%);
@@ -183,7 +178,7 @@ const ConfirmDeleteBtn = styled.button`
   &:hover {
     background: hsl(0, 85%, 55%);
   }
-`;
+`
 
 const CancelDeleteBtn = styled.button`
   background: rgba(255, 255, 255, 0.05);
@@ -197,7 +192,7 @@ const CancelDeleteBtn = styled.button`
   &:hover {
     background: rgba(255, 255, 255, 0.1);
   }
-`;
+`
 
 const DeleteIconButton = styled.button`
   background: none;
@@ -219,7 +214,7 @@ const DeleteIconButton = styled.button`
   &:hover svg {
     fill: hsl(0, 75%, 65%);
   }
-`;
+`
 
 const ThoughtText = styled.div`
   font-size: 14px;
@@ -227,7 +222,7 @@ const ThoughtText = styled.div`
   color: ${theme.colors.text.primary};
   white-space: pre-wrap;
   font-weight: 450;
-`;
+`
 
 const SourceExcerpt = styled.blockquote`
   margin: 0;
@@ -243,7 +238,7 @@ const SourceExcerpt = styled.blockquote`
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-`;
+`
 
 const SourceFooter = styled.div`
   display: flex;
@@ -252,14 +247,14 @@ const SourceFooter = styled.div`
   border-top: 1px solid rgba(255, 255, 255, 0.03);
   padding-top: 10px;
   margin-top: 4px;
-`;
+`
 
 const SourceIcon = styled.svg`
   width: 12px;
   height: 12px;
   fill: ${theme.colors.text.muted};
   flex-shrink: 0;
-`;
+`
 
 const LinkAnchor = styled.a`
   font-size: 12px;
@@ -276,7 +271,7 @@ const LinkAnchor = styled.a`
     color: ${theme.colors.text.accent};
     text-decoration: underline;
   }
-`;
+`
 
 const SourceHost = styled.span`
   font-size: 10px;
@@ -286,4 +281,4 @@ const SourceHost = styled.span`
   white-space: nowrap;
   flex: 1;
   text-align: right;
-`;
+`

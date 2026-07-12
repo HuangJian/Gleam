@@ -1,23 +1,23 @@
-export type SourceType = 'url' | 'book' | 'conversation' | 'experience' | 'thought';
+export type SourceType = 'url' | 'book' | 'conversation' | 'experience' | 'thought'
 
 export interface Source {
-  type: SourceType;
-  url?: string;
-  title?: string;
-  excerpt?: string;
+  type: SourceType
+  url?: string
+  title?: string
+  excerpt?: string
 }
 
 export interface Gleam {
   // Core fields (Immutable)
-  id: string; // UUID v7
-  thought: string; // The user's understanding
-  source: Source; // Reconstructable context
-  created_at: string; // ISO 8601 string
+  id: string // UUID v7
+  thought: string // The user's understanding
+  source: Source // Reconstructable context
+  created_at: string // ISO 8601 string
 
   // Derived fields (Mutable)
-  tags?: string[];
-  revisit_count?: number;
-  last_revisited_at?: string;
+  tags?: string[]
+  revisit_count?: number
+  last_revisited_at?: string
 }
 
 /**
@@ -27,13 +27,13 @@ export function createGleam(
   id: string,
   thought: string,
   source: Source,
-  createdAt?: string
+  createdAt?: string,
 ): Gleam {
   if (!thought || thought.trim() === '') {
-    throw new Error('Thought cannot be empty');
+    throw new Error('Thought cannot be empty')
   }
   if (!source.type) {
-    throw new Error('Source type is required');
+    throw new Error('Source type is required')
   }
 
   return {
@@ -48,5 +48,5 @@ export function createGleam(
     created_at: createdAt || new Date().toISOString(),
     tags: [],
     revisit_count: 0,
-  };
+  }
 }

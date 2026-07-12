@@ -1,0 +1,6 @@
+{
+  "semi": false,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "ignorePatterns": ["doc/manifest/**", "doc/MANIFEST.md"]
+}

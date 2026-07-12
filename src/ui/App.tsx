@@ -1,94 +1,94 @@
-import { useState, useEffect } from 'preact/hooks';
-import styled from '@emotion/styled';
-import { IRepository } from '../domain/repository';
-import { CaptureService } from '../services/capture';
-import { TimelineService, TimelineGroup } from '../services/timeline';
-import { CaptureTrigger } from './components/CaptureTrigger';
-import { CapturePanel } from './components/CapturePanel';
-import { ReviewSidebar } from './components/ReviewSidebar';
-import { theme } from './theme';
+import { useState, useEffect } from 'preact/hooks'
+import styled from '@emotion/styled'
+import { IRepository } from '../domain/repository'
+import { CaptureService } from '../services/capture'
+import { TimelineService, TimelineGroup } from '../services/timeline'
+import { CaptureTrigger } from './components/CaptureTrigger'
+import { CapturePanel } from './components/CapturePanel'
+import { ReviewSidebar } from './components/ReviewSidebar'
+import { theme } from './theme'
 
 interface AppProps {
-  repository: IRepository;
-  shadowHost: HTMLElement;
+  repository: IRepository
+  shadowHost: HTMLElement
 }
 
 export function App({ repository, shadowHost }: AppProps) {
-  const [isCaptureOpen, setIsCaptureOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeExcerpt, setActiveExcerpt] = useState('');
-  const [timelineGroups, setTimelineGroups] = useState<TimelineGroup[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [isCaptureOpen, setIsCaptureOpen] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [activeExcerpt, setActiveExcerpt] = useState('')
+  const [timelineGroups, setTimelineGroups] = useState<TimelineGroup[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const captureService = new CaptureService(repository);
-  const timelineService = new TimelineService(repository);
+  const captureService = new CaptureService(repository)
+  const timelineService = new TimelineService(repository)
 
   // Load and refresh timeline
   const refreshTimeline = async (query = searchQuery) => {
-    const groups = await timelineService.getTimeline(query);
-    setTimelineGroups(groups);
-  };
+    const groups = await timelineService.getTimeline(query)
+    setTimelineGroups(groups)
+  }
 
   useEffect(() => {
-    refreshTimeline();
-  }, [searchQuery]);
+    refreshTimeline()
+  }, [searchQuery])
 
   // Handle global shortcuts: Ctrl+Shift+G or Cmd+Shift+G to trigger quick capture
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      const isG = e.key.toLowerCase() === 'g';
-      const isModifier = e.ctrlKey || e.metaKey;
-      const isShift = e.shiftKey;
+      const isG = e.key.toLowerCase() === 'g'
+      const isModifier = e.ctrlKey || e.metaKey
+      const isShift = e.shiftKey
 
       if (isModifier && isShift && isG) {
-        e.preventDefault();
-        setActiveExcerpt('');
-        setIsCaptureOpen(true);
+        e.preventDefault()
+        setActiveExcerpt('')
+        setIsCaptureOpen(true)
       }
-    };
+    }
 
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [])
 
   const handleTriggerCapture = (excerpt: string) => {
-    setActiveExcerpt(excerpt);
-    setIsCaptureOpen(true);
-  };
+    setActiveExcerpt(excerpt)
+    setIsCaptureOpen(true)
+  }
 
   const handleSaveCapture = async (thought: string) => {
-    await captureService.capture(thought, activeExcerpt || undefined);
-    await refreshTimeline();
-  };
+    await captureService.capture(thought, activeExcerpt || undefined)
+    await refreshTimeline()
+  }
 
   const handleDeleteGleam = async (id: string) => {
-    await repository.delete(id);
-    await refreshTimeline();
-  };
+    await repository.delete(id)
+    await refreshTimeline()
+  }
 
   const handleRevisitGleam = async (id: string) => {
-    await timelineService.recordRevisit(id);
+    await timelineService.recordRevisit(id)
     // Don't full refresh to avoid scroll jump, just update count locally or refresh quietly
-    await refreshTimeline();
-  };
+    await refreshTimeline()
+  }
 
   const handleExportData = async () => {
     try {
-      const allGleams = await repository.getAll();
-      const dataStr = JSON.stringify(allGleams, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-      
-      const exportFileDefaultName = `gleam_export_${new Date().toISOString().slice(0, 10)}.json`;
-      
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      linkElement.click();
+      const allGleams = await repository.getAll()
+      const dataStr = JSON.stringify(allGleams, null, 2)
+      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr)
+
+      const exportFileDefaultName = `gleam_export_${new Date().toISOString().slice(0, 10)}.json`
+
+      const linkElement = document.createElement('a')
+      linkElement.setAttribute('href', dataUri)
+      linkElement.setAttribute('download', exportFileDefaultName)
+      linkElement.click()
     } catch (e) {
-      console.error('Failed to export data:', e);
-      alert('数据导出失败');
+      console.error('Failed to export data:', e)
+      alert('数据导出失败')
     }
-  };
+  }
 
   return (
     <>
@@ -110,8 +110,8 @@ export function App({ repository, shadowHost }: AppProps) {
           excerpt={activeExcerpt}
           onSave={handleSaveCapture}
           onClose={() => {
-            setIsCaptureOpen(false);
-            setActiveExcerpt('');
+            setIsCaptureOpen(false)
+            setActiveExcerpt('')
           }}
         />
       )}
@@ -127,7 +127,7 @@ export function App({ repository, shadowHost }: AppProps) {
         onExport={handleExportData}
       />
     </>
-  );
+  )
 }
 
 const SidebarFAB = styled.button`
@@ -154,11 +154,11 @@ const SidebarFAB = styled.button`
     transform: scale(1.1) translateY(-2px);
     box-shadow: 0 0 25px ${theme.colors.brand.primary};
   }
-`;
+`
 
 const GleamIcon = styled.svg`
   width: 20px;
   height: 20px;
   fill: ${theme.colors.text.accent};
   filter: drop-shadow(0 0 4px ${theme.colors.brand.primary});
-`;
+`

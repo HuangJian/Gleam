@@ -19,13 +19,14 @@ export const theme = {
       success: 'hsl(145, 80%, 65%)',
     },
     brand: {
-      primary: 'hsl(38, 92%, 55%)',     // Gleam Warm Gold
+      primary: 'hsl(38, 92%, 55%)', // Gleam Warm Gold
       primaryHover: 'hsl(38, 95%, 65%)',
       glow: 'rgba(253, 186, 116, 0.15)',
-    }
+    },
   },
   typography: {
-    fontFamily: '"Outfit", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily:
+      '"Outfit", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
   shadows: {
     glow: '0 0 20px rgba(253, 186, 116, 0.25)',
@@ -35,5 +36,5 @@ export const theme = {
   animations: {
     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
     spring: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-  }
-};
+  },
+}

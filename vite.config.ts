@@ -1,6 +1,6 @@
-import { defineConfig } from 'vite';
-import preact from '@preact/preset-vite';
-import monkey from 'vite-plugin-monkey';
+import { defineConfig } from 'vite'
+import preact from '@preact/preset-vite'
+import monkey from 'vite-plugin-monkey'
 
 export default defineConfig({
   plugins: [
@@ -13,20 +13,16 @@ export default defineConfig({
         version: '0.1.0',
         description: '记录你在时间里认知的痕迹',
         match: ['http://*/*', 'https://*/*'],
-        grant: [
-          'GM_setValue',
-          'GM_getValue',
-          'GM_registerMenuCommand'
-        ],
-        runAt: 'document-idle'
-      }
-    })
+        grant: ['GM_setValue', 'GM_getValue', 'GM_registerMenuCommand'],
+        runAt: 'document-idle',
+      },
+    }),
   ],
   resolve: {
     alias: {
       react: 'preact/compat',
       'react-dom': 'preact/compat',
-      'react/jsx-runtime': 'preact/jsx-runtime'
-    }
-  }
-});
+      'react/jsx-runtime': 'preact/jsx-runtime',
+    },
+  },
+})

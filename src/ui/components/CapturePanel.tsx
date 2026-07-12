@@ -1,56 +1,56 @@
-import { useEffect, useState, useRef } from 'preact/hooks';
-import styled from '@emotion/styled';
-import { theme } from '../theme';
+import { useEffect, useState, useRef } from 'preact/hooks'
+import styled from '@emotion/styled'
+import { theme } from '../theme'
 
 interface CapturePanelProps {
-  excerpt?: string;
-  onSave: (thought: string) => Promise<void>;
-  onClose: () => void;
+  excerpt?: string
+  onSave: (thought: string) => Promise<void>
+  onClose: () => void
 }
 
 export function CapturePanel({ excerpt, onSave, onClose }: CapturePanelProps) {
-  const [thought, setThought] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [thought, setThought] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     // Focus textarea on mount
-    textareaRef.current?.focus();
+    textareaRef.current?.focus()
 
     // Prevent background scrolling
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden'
     return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
+      document.body.style.overflow = ''
+    }
+  }, [])
 
   const handleSave = async () => {
     if (!thought.trim()) {
-      setError('理解内容不能为空');
-      return;
+      setError('理解内容不能为空')
+      return
     }
-    setError('');
-    setIsSaving(true);
+    setError('')
+    setIsSaving(true)
     try {
-      await onSave(thought);
-      onClose();
+      await onSave(thought)
+      onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存失败');
+      setError(err instanceof Error ? err.message : '保存失败')
     } finally {
-      setIsSaving(false);
+      setIsSaving(false)
     }
-  };
+  }
 
   // Support CMD+Enter / CTRL+Enter to save
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      handleSave();
+      e.preventDefault()
+      handleSave()
     } else if (e.key === 'Escape') {
-      onClose();
+      onClose()
     }
-  };
+  }
 
   return (
     <Overlay onClick={onClose}>
@@ -100,7 +100,7 @@ export function CapturePanel({ excerpt, onSave, onClose }: CapturePanelProps) {
         </Footer>
       </PanelCard>
     </Overlay>
-  );
+  )
 }
 
 const Overlay = styled.div`
@@ -119,10 +119,14 @@ const Overlay = styled.div`
   animation: fadeIn 0.25s ease-out;
 
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
-`;
+`
 
 const PanelCard = styled.div`
   width: 90%;
@@ -147,7 +151,7 @@ const PanelCard = styled.div`
       transform: translateY(0) scale(1);
     }
   }
-`;
+`
 
 const Header = styled.header`
   display: flex;
@@ -155,20 +159,20 @@ const Header = styled.header`
   align-items: center;
   padding: 18px 24px;
   border-bottom: 1px solid ${theme.colors.border.light};
-`;
+`
 
 const TitleArea = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
-`;
+`
 
 const GleamIcon = styled.svg`
   width: 18px;
   height: 18px;
   fill: ${theme.colors.text.accent};
   filter: drop-shadow(0 0 4px ${theme.colors.brand.primary});
-`;
+`
 
 const Title = styled.h2`
   margin: 0;
@@ -176,7 +180,7 @@ const Title = styled.h2`
   font-weight: 600;
   color: ${theme.colors.text.primary};
   letter-spacing: 0.5px;
-`;
+`
 
 const CloseButton = styled.button`
   background: none;
@@ -191,20 +195,20 @@ const CloseButton = styled.button`
   &:hover {
     color: ${theme.colors.text.primary};
   }
-`;
+`
 
 const Content = styled.div`
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
-`;
+`
 
 const ExcerptSection = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
-`;
+`
 
 const SectionLabel = styled.span`
   font-size: 11px;
@@ -212,7 +216,7 @@ const SectionLabel = styled.span`
   letter-spacing: 1px;
   color: ${theme.colors.text.muted};
   font-weight: 600;
-`;
+`
 
 const ExcerptText = styled.blockquote`
   margin: 0;
@@ -226,13 +230,13 @@ const ExcerptText = styled.blockquote`
   font-style: italic;
   max-height: 100px;
   overflow-y: auto;
-`;
+`
 
 const InputSection = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
-`;
+`
 
 const StyledTextarea = styled.textarea`
   width: 100%;
@@ -254,18 +258,18 @@ const StyledTextarea = styled.textarea`
     border-color: ${theme.colors.border.focus};
     box-shadow: 0 0 10px ${theme.colors.brand.glow};
   }
-`;
+`
 
 const Tip = styled.span`
   font-size: 11px;
   color: ${theme.colors.text.muted};
   text-align: right;
-`;
+`
 
 const ErrorMessage = styled.div`
   color: hsl(0, 85%, 65%);
   font-size: 12px;
-`;
+`
 
 const Footer = styled.footer`
   display: flex;
@@ -274,7 +278,7 @@ const Footer = styled.footer`
   padding: 18px 24px;
   background: rgba(0, 0, 0, 0.15);
   border-top: 1px solid ${theme.colors.border.light};
-`;
+`
 
 const CancelButton = styled.button`
   background: none;
@@ -292,7 +296,7 @@ const CancelButton = styled.button`
     background: rgba(255, 255, 255, 0.05);
     color: ${theme.colors.text.primary};
   }
-`;
+`
 
 const SaveButton = styled.button`
   background: ${theme.colors.brand.primary};
@@ -318,4 +322,4 @@ const SaveButton = styled.button`
     cursor: not-allowed;
     box-shadow: none;
   }
-`;
+`

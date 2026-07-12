@@ -1,9 +1,9 @@
-import styled from '@emotion/styled';
-import { theme } from '../theme';
+import styled from '@emotion/styled'
+import { theme } from '../theme'
 
 interface SearchBarProps {
-  value: string;
-  onChange: (value: string) => void;
+  value: string
+  onChange: (value: string) => void
 }
 
 export function SearchBar({ value, onChange }: SearchBarProps) {
@@ -25,7 +25,7 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
         </ClearButton>
       )}
     </SearchContainer>
-  );
+  )
 }
 
 const SearchContainer = styled.div`
@@ -42,14 +42,14 @@ const SearchContainer = styled.div`
     border-color: ${theme.colors.border.focus};
     box-shadow: 0 0 10px ${theme.colors.brand.glow};
   }
-`;
+`
 
 const SearchIcon = styled.svg`
   width: 16px;
   height: 16px;
   fill: ${theme.colors.text.muted};
   flex-shrink: 0;
-`;
+`
 
 const StyledInput = styled.input`
   background: none;
@@ -64,7 +64,7 @@ const StyledInput = styled.input`
   &::placeholder {
     color: ${theme.colors.text.muted};
   }
-`;
+`
 
 const ClearButton = styled.button`
   background: none;
@@ -81,4 +81,4 @@ const ClearButton = styled.button`
   &:hover {
     color: ${theme.colors.text.primary};
   }
-`;
+`

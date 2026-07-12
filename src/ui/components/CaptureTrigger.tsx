@@ -1,86 +1,86 @@
-import { useEffect, useState, useRef } from 'preact/hooks';
-import styled from '@emotion/styled';
-import { theme } from '../theme';
+import { useEffect, useState, useRef } from 'preact/hooks'
+import styled from '@emotion/styled'
+import { theme } from '../theme'
 
 interface CaptureTriggerProps {
-  onTrigger: (excerpt: string) => void;
-  shadowHost: HTMLElement;
+  onTrigger: (excerpt: string) => void
+  shadowHost: HTMLElement
 }
 
 export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
-  const [selectionText, setSelectionText] = useState('');
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
+  const [selectionText, setSelectionText] = useState('')
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const handleMouseUp = (e: MouseEvent) => {
       // Ignore clicks inside our own shadow host
       if (shadowHost.contains(e.target as Node)) {
-        return;
+        return
       }
 
       // Small delay to let the browser finalize selection
       setTimeout(() => {
-        const selection = window.getSelection();
-        if (!selection) return;
+        const selection = window.getSelection()
+        if (!selection) return
 
-        const text = selection.toString().trim();
+        const text = selection.toString().trim()
         if (!text) {
-          setPosition(null);
-          setSelectionText('');
-          return;
+          setPosition(null)
+          setSelectionText('')
+          return
         }
 
         // Check if selection is inside an input or textarea
-        const activeEl = document.activeElement;
+        const activeEl = document.activeElement
         if (
           activeEl &&
           (activeEl.tagName === 'INPUT' ||
             activeEl.tagName === 'TEXTAREA' ||
             (activeEl as HTMLElement).isContentEditable)
         ) {
-          setPosition(null);
-          setSelectionText('');
-          return;
+          setPosition(null)
+          setSelectionText('')
+          return
         }
 
         try {
-          const range = selection.getRangeAt(0);
-          const rect = range.getBoundingClientRect();
+          const range = selection.getRangeAt(0)
+          const rect = range.getBoundingClientRect()
 
           // Calculate absolute position on the viewport
           // Place button centered above the selection
-          const x = rect.left + rect.width / 2;
-          const y = rect.top + window.scrollY - 40;
+          const x = rect.left + rect.width / 2
+          const y = rect.top + window.scrollY - 40
 
-          setPosition({ x, y });
-          setSelectionText(text);
-        } catch (err) {
+          setPosition({ x, y })
+          setSelectionText(text)
+        } catch {
           // Range might be invalid
-          setPosition(null);
-          setSelectionText('');
+          setPosition(null)
+          setSelectionText('')
         }
-      }, 50);
-    };
+      }, 50)
+    }
 
     const handleMouseDown = (e: MouseEvent) => {
       // Clicking our button should not close the trigger immediately
       if (buttonRef.current?.contains(e.target as Node)) {
-        return;
+        return
       }
-      setPosition(null);
-    };
+      setPosition(null)
+    }
 
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('mousedown', handleMouseDown)
 
     return () => {
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('mousedown', handleMouseDown);
-    };
-  }, [shadowHost]);
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('mousedown', handleMouseDown)
+    }
+  }, [shadowHost])
 
-  if (!position) return null;
+  if (!position) return null
 
   return (
     <FloatingButton
@@ -90,11 +90,11 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
         top: `${position.y}px`,
       }}
       onClick={(e: MouseEvent) => {
-        e.stopPropagation();
-        onTrigger(selectionText);
-        setPosition(null);
+        e.stopPropagation()
+        onTrigger(selectionText)
+        setPosition(null)
         // Clear window selection
-        window.getSelection()?.removeAllRanges();
+        window.getSelection()?.removeAllRanges()
       }}
     >
       <GleamIcon viewBox="0 0 24 24">
@@ -102,7 +102,7 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
       </GleamIcon>
       <span>拾光</span>
     </FloatingButton>
-  );
+  )
 }
 
 const FloatingButton = styled.button`
@@ -144,11 +144,11 @@ const FloatingButton = styled.button`
       transform: translate(-50%, -100%) scale(1);
     }
   }
-`;
+`
 
 const GleamIcon = styled.svg`
   width: 14px;
   height: 14px;
   fill: ${theme.colors.text.accent};
   filter: drop-shadow(0 0 3px ${theme.colors.brand.primary});
-`;
+`

@@ -1,18 +1,18 @@
-import { useState, useEffect } from 'preact/hooks';
-import styled from '@emotion/styled';
-import { TimelineGroup } from '../../services/timeline';
-import { GleamCard } from './GleamCard';
-import { SearchBar } from './SearchBar';
-import { theme } from '../theme';
+import { useState, useEffect } from 'preact/hooks'
+import styled from '@emotion/styled'
+import { TimelineGroup } from '../../services/timeline'
+import { GleamCard } from './GleamCard'
+import { SearchBar } from './SearchBar'
+import { theme } from '../theme'
 
 interface ReviewSidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
-  timelineGroups: TimelineGroup[];
-  onDeleteGleam: (id: string) => Promise<void>;
-  onRevisitGleam: (id: string) => Promise<void>;
-  onSearch: (query: string) => void;
-  onExport: () => void;
+  isOpen: boolean
+  onClose: () => void
+  timelineGroups: TimelineGroup[]
+  onDeleteGleam: (id: string) => Promise<void>
+  onRevisitGleam: (id: string) => Promise<void>
+  onSearch: (query: string) => void
+  onExport: () => void
 }
 
 export function ReviewSidebar({
@@ -24,13 +24,13 @@ export function ReviewSidebar({
   onSearch,
   onExport,
 }: ReviewSidebarProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    onSearch(searchQuery);
-  }, [searchQuery]);
+    onSearch(searchQuery)
+  }, [searchQuery])
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   return (
     <SidebarContainer>
@@ -93,7 +93,7 @@ export function ReviewSidebar({
         )}
       </ScrollableContent>
     </SidebarContainer>
-  );
+  )
 }
 
 const SidebarContainer = styled.div`
@@ -122,7 +122,7 @@ const SidebarContainer = styled.div`
       transform: translateX(0);
     }
   }
-`;
+`
 
 const SidebarHeader = styled.header`
   display: flex;
@@ -130,7 +130,7 @@ const SidebarHeader = styled.header`
   align-items: center;
   padding: 16px 20px;
   border-bottom: 1px solid ${theme.colors.border.light};
-`;
+`
 
 const HeaderTitle = styled.div`
   display: flex;
@@ -140,20 +140,20 @@ const HeaderTitle = styled.div`
   font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.5px;
-`;
+`
 
 const GleamIcon = styled.svg`
   width: 16px;
   height: 16px;
   fill: ${theme.colors.text.accent};
   filter: drop-shadow(0 0 3px ${theme.colors.brand.primary});
-`;
+`
 
 const HeaderActions = styled.div`
   display: flex;
   align-items: center;
   gap: 12px;
-`;
+`
 
 const ExportButton = styled.button`
   background: none;
@@ -175,7 +175,7 @@ const ExportButton = styled.button`
   &:hover svg {
     fill: ${theme.colors.text.primary};
   }
-`;
+`
 
 const CloseButton = styled.button`
   background: none;
@@ -190,12 +190,12 @@ const CloseButton = styled.button`
   &:hover {
     color: ${theme.colors.text.primary};
   }
-`;
+`
 
 const SearchWrapper = styled.div`
   padding: 14px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-`;
+`
 
 const ScrollableContent = styled.div`
   flex: 1;
@@ -204,7 +204,7 @@ const ScrollableContent = styled.div`
   display: flex;
   flex-direction: column;
   gap: 20px;
-`;
+`
 
 const EmptyState = styled.div`
   display: flex;
@@ -214,21 +214,21 @@ const EmptyState = styled.div`
   text-align: center;
   height: 60%;
   padding: 20px;
-`;
+`
 
 const EmptyIcon = styled.svg`
   width: 40px;
   height: 40px;
   fill: rgba(255, 255, 255, 0.05);
   margin-bottom: 16px;
-`;
+`
 
 const EmptyText = styled.h3`
   margin: 0 0 8px 0;
   font-size: 15px;
   font-weight: 500;
   color: ${theme.colors.text.secondary};
-`;
+`
 
 const EmptySubtext = styled.p`
   margin: 0;
@@ -244,31 +244,31 @@ const EmptySubtext = styled.p`
     font-size: 11px;
     color: ${theme.colors.text.secondary};
   }
-`;
+`
 
 const TimelineList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 24px;
-`;
+`
 
 const TimelineGroupSection = styled.section`
   display: flex;
   flex-direction: column;
   gap: 12px;
-`;
+`
 
 const GroupHeader = styled.div`
   display: flex;
   align-items: center;
   gap: 10px;
-`;
+`
 
 const GroupLine = styled.div`
   flex: 1;
   height: 1px;
   background: rgba(255, 255, 255, 0.04);
-`;
+`
 
 const GroupDateLabel = styled.span`
   font-size: 11px;
@@ -276,10 +276,10 @@ const GroupDateLabel = styled.span`
   text-transform: uppercase;
   letter-spacing: 1px;
   color: ${theme.colors.text.muted};
-`;
+`
 
 const GleamList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 14px;
-`;
+`
