@@ -23,6 +23,31 @@ function formatThoughtLabel(isoString: string): string {
   return `${year}-${month}-${day} ${hour}:${minute} 的理解 (Thought)`
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * Build the HTML for the indent-visibility overlay. Only the leading whitespace
+ * of each line is replaced with a visible gold dot (rendered over a real space
+ * so the rest of the text stays pixel-aligned with the textarea). The remaining
+ * text is escaped and rendered as-is.
+ */
+function buildIndentOverlayHtml(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => {
+      const lead = line.match(/^ */)?.[0].length ?? 0
+      const dots = line
+        .slice(0, lead)
+        .split('')
+        .map(() => '<span class="indent-dot"> <span class="dot">·</span></span>')
+        .join('')
+      return dots + escapeHtml(line.slice(lead))
+    })
+    .join('\n')
+}
+
 export function CapturePanel({
   excerpt,
   initialThought = '',
@@ -35,6 +60,7 @@ export function CapturePanel({
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [mode, setMode] = useState<'write' | 'preview'>('write')
+  const [showIndent, setShowIndent] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -128,17 +154,34 @@ export function CapturePanel({
                       Preview
                     </TabButton>
                   </TabGroup>
-                  <MarkdownHint>Markdown</MarkdownHint>
+                  <IndentToggle
+                    type="button"
+                    $active={showIndent}
+                    onClick={() => setShowIndent((v) => !v)}
+                    title="显示行首缩进（用于软换行续行）"
+                    aria-pressed={showIndent}
+                  >
+                    <input type="checkbox" checked={showIndent} readOnly tabIndex={-1} />␣ 缩进
+                  </IndentToggle>
                 </EditorToolbar>
                 {mode === 'write' ? (
-                  <StyledTextarea
-                    ref={textareaRef}
-                    placeholder="写下你此刻真实的理解：感想、总结、类比、疑问、进展、猜测、直觉、…… 支持 Markdown 格式"
-                    value={thought}
-                    onInput={(e: any) => setThought((e.target as HTMLTextAreaElement).value)}
-                    onKeyDown={handleKeyDown}
-                    disabled={isSaving}
-                  />
+                  <EditorWrap>
+                    <StyledTextarea
+                      ref={textareaRef}
+                      $ghost={showIndent}
+                      placeholder="写下你此刻真实的理解：感想、总结、类比、疑问、进展、猜测、直觉、…… 支持 Markdown 格式"
+                      value={thought}
+                      onInput={(e: any) => setThought((e.target as HTMLTextAreaElement).value)}
+                      onKeyDown={handleKeyDown}
+                      disabled={isSaving}
+                    />
+                    {showIndent && (
+                      <IndentOverlay
+                        aria-hidden="true"
+                        dangerouslySetInnerHTML={{ __html: buildIndentOverlayHtml(thought) }}
+                      />
+                    )}
+                  </EditorWrap>
                 ) : (
                   <PreviewArea>
                     {thought.trim() ? (
@@ -354,17 +397,48 @@ const TabButton = styled.button<{ $active: boolean }>`
   }
 `
 
-const MarkdownHint = styled.span`
-  font-size: 10px;
-  color: ${theme.colors.text.muted};
-  font-weight: 500;
-  letter-spacing: 0.5px;
+const IndentToggle = styled.button<{ $active: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: ${(p) => (p.$active ? theme.colors.brand.glow : 'transparent')};
+  border: 1px solid ${(p) => (p.$active ? theme.colors.border.focus : theme.colors.border.light)};
+  border-radius: 6px;
+  padding: 4px 10px;
+  color: ${(p) => (p.$active ? theme.colors.text.accent : theme.colors.text.muted)};
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: ${theme.animations.transition};
+
+  &:hover {
+    color: ${theme.colors.text.accent};
+    border-color: ${theme.colors.border.focus};
+  }
+
+  input[type='checkbox'] {
+    margin: 0;
+    width: 12px;
+    height: 12px;
+    accent-color: ${theme.colors.brand.primary};
+    cursor: pointer;
+    pointer-events: none;
+  }
 `
 
-const StyledTextarea = styled.textarea`
-  width: 100%;
+const EditorWrap = styled.div`
+  position: relative;
   flex: 1;
   min-height: 120px;
+`
+
+const IndentOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
   background: ${theme.colors.bg.input};
   border: 1px solid ${theme.colors.border.light};
   border-radius: 10px;
@@ -373,10 +447,45 @@ const StyledTextarea = styled.textarea`
   font-family: inherit;
   font-size: 14px;
   line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: auto;
+  box-sizing: border-box;
+  z-index: 1;
+
+  .indent-dot {
+    position: relative;
+    color: transparent;
+  }
+
+  .dot {
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: ${theme.colors.brand.primary};
+    opacity: 0.7;
+  }
+`
+
+const StyledTextarea = styled.textarea<{ $ghost?: boolean }>`
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: ${(p) => (p.$ghost ? 'transparent' : theme.colors.bg.input)};
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 10px;
+  padding: 14px;
+  color: ${(p) => (p.$ghost ? 'transparent' : theme.colors.text.primary)};
+  caret-color: ${theme.colors.text.primary};
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
   resize: none;
   outline: none;
   box-sizing: border-box;
   transition: ${theme.animations.transition};
+  z-index: 2;
 
   &:focus {
     border-color: ${theme.colors.border.focus};
