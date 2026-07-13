@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'preact/hooks'
 import styled from '@emotion/styled'
 import { theme } from '../theme'
+import { METEOR_ICON_URL } from '../assets'
 
 interface CaptureTriggerProps {
   onTrigger: (excerpt: string) => void
@@ -68,6 +69,10 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
       if (buttonRef.current?.contains(e.target as Node)) {
         return
       }
+      // Ignore clicks inside our own shadow host
+      if (shadowHost.contains(e.target as Node)) {
+        return
+      }
       setPosition(null)
     }
 
@@ -97,9 +102,7 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
         window.getSelection()?.removeAllRanges()
       }}
     >
-      <GleamIcon viewBox="0 0 24 24">
-        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-      </GleamIcon>
+      <GleamIcon src={METEOR_ICON_URL} alt="" />
       <span>拾光</span>
     </FloatingButton>
   )
@@ -146,9 +149,8 @@ const FloatingButton = styled.button`
   }
 `
 
-const GleamIcon = styled.svg`
+const GleamIcon = styled.img`
   width: 14px;
   height: 14px;
-  fill: ${theme.colors.text.accent};
   filter: drop-shadow(0 0 3px ${theme.colors.brand.primary});
 `

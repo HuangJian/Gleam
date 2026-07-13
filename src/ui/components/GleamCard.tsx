@@ -118,8 +118,8 @@ const Card = styled.div`
   &:hover {
     border-color: ${theme.colors.border.light};
     transform: translateY(-2px);
-    background: rgba(35, 41, 59, 0.9);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    background: rgba(255, 253, 248, 1);
+    box-shadow: 0 4px 20px rgba(120, 100, 60, 0.12);
   }
 
   &::before {
@@ -154,7 +154,7 @@ const HeaderActions = styled.div`
 
 const RevisitBadge = styled.span`
   font-size: 11px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(200, 180, 140, 0.15);
   padding: 2px 6px;
   border-radius: 4px;
   color: ${theme.colors.text.muted};
@@ -181,7 +181,7 @@ const ConfirmDeleteBtn = styled.button`
 `
 
 const CancelDeleteBtn = styled.button`
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(200, 180, 140, 0.1);
   border: 1px solid ${theme.colors.border.light};
   color: ${theme.colors.text.secondary};
   font-size: 10px;
@@ -190,7 +190,7 @@ const CancelDeleteBtn = styled.button`
   cursor: pointer;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(200, 180, 140, 0.2);
   }
 `
 
@@ -227,8 +227,8 @@ const ThoughtText = styled.div`
 const SourceExcerpt = styled.blockquote`
   margin: 0;
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.015);
-  border-left: 2px solid rgba(255, 255, 255, 0.15);
+  background: rgba(200, 180, 140, 0.06);
+  border-left: 2px solid rgba(200, 180, 140, 0.3);
   font-size: 12px;
   color: ${theme.colors.text.secondary};
   line-height: 1.5;
@@ -244,7 +244,7 @@ const SourceFooter = styled.div`
   display: flex;
   align-items: center;
   gap: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  border-top: 1px solid rgba(200, 180, 140, 0.15);
   padding-top: 10px;
   margin-top: 4px;
 `

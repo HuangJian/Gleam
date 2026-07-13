@@ -7,6 +7,7 @@ import { CaptureTrigger } from './components/CaptureTrigger'
 import { CapturePanel } from './components/CapturePanel'
 import { ReviewSidebar } from './components/ReviewSidebar'
 import { theme } from './theme'
+import { METEOR_ICON_URL } from './assets'
 
 interface AppProps {
   repository: IRepository
@@ -98,9 +99,7 @@ export function App({ repository, shadowHost }: AppProps) {
       {/* Floating Action Button (FAB) to open sidebar */}
       {!isSidebarOpen && (
         <SidebarFAB onClick={() => setIsSidebarOpen(true)} title="打开拾光志">
-          <GleamIcon viewBox="0 0 24 24">
-            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-          </GleamIcon>
+          <GleamIcon src={METEOR_ICON_URL} alt="" />
         </SidebarFAB>
       )}
 
@@ -156,9 +155,8 @@ const SidebarFAB = styled.button`
   }
 `
 
-const GleamIcon = styled.svg`
+const GleamIcon = styled.img`
   width: 20px;
   height: 20px;
-  fill: ${theme.colors.text.accent};
   filter: drop-shadow(0 0 4px ${theme.colors.brand.primary});
 `

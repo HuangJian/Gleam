@@ -4,6 +4,7 @@ import { TimelineGroup } from '../../services/timeline'
 import { GleamCard } from './GleamCard'
 import { SearchBar } from './SearchBar'
 import { theme } from '../theme'
+import { METEOR_ICON_URL } from '../assets'
 
 interface ReviewSidebarProps {
   isOpen: boolean
@@ -36,9 +37,7 @@ export function ReviewSidebar({
     <SidebarContainer>
       <SidebarHeader>
         <HeaderTitle>
-          <GleamIcon viewBox="0 0 24 24">
-            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-          </GleamIcon>
+          <GleamIcon src={METEOR_ICON_URL} alt="" />
           <span>拾光志 · 认知演化</span>
         </HeaderTitle>
         <HeaderActions>
@@ -60,9 +59,7 @@ export function ReviewSidebar({
       <ScrollableContent>
         {timelineGroups.length === 0 ? (
           <EmptyState>
-            <EmptyIcon viewBox="0 0 24 24">
-              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-            </EmptyIcon>
+            <EmptyIcon src={METEOR_ICON_URL} alt="" />
             <EmptyText>微光待启</EmptyText>
             <EmptySubtext>
               划选页面文字，或按 <kbd>Ctrl+Shift+G</kbd> 记录你的第一个理解瞬间。
@@ -142,10 +139,9 @@ const HeaderTitle = styled.div`
   letter-spacing: 0.5px;
 `
 
-const GleamIcon = styled.svg`
+const GleamIcon = styled.img`
   width: 16px;
   height: 16px;
-  fill: ${theme.colors.text.accent};
   filter: drop-shadow(0 0 3px ${theme.colors.brand.primary});
 `
 
@@ -194,7 +190,7 @@ const CloseButton = styled.button`
 
 const SearchWrapper = styled.div`
   padding: 14px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(200, 180, 140, 0.15);
 `
 
 const ScrollableContent = styled.div`
@@ -216,10 +212,10 @@ const EmptyState = styled.div`
   padding: 20px;
 `
 
-const EmptyIcon = styled.svg`
+const EmptyIcon = styled.img`
   width: 40px;
   height: 40px;
-  fill: rgba(255, 255, 255, 0.05);
+  opacity: 0.25;
   margin-bottom: 16px;
 `
 
@@ -237,8 +233,8 @@ const EmptySubtext = styled.p`
   line-height: 1.6;
 
   kbd {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(200, 180, 140, 0.15);
+    border: 1px solid rgba(200, 180, 140, 0.25);
     border-radius: 4px;
     padding: 2px 4px;
     font-size: 11px;
@@ -267,7 +263,7 @@ const GroupHeader = styled.div`
 const GroupLine = styled.div`
   flex: 1;
   height: 1px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(200, 180, 140, 0.2);
 `
 
 const GroupDateLabel = styled.span`

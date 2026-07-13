@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'preact/hooks'
 import styled from '@emotion/styled'
 import { theme } from '../theme'
+import { METEOR_ICON_URL } from '../assets'
 
 interface CapturePanelProps {
   excerpt?: string
@@ -57,9 +58,7 @@ export function CapturePanel({ excerpt, onSave, onClose }: CapturePanelProps) {
       <PanelCard onClick={(e: MouseEvent) => e.stopPropagation()}>
         <Header>
           <TitleArea>
-            <GleamIcon viewBox="0 0 24 24">
-              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-            </GleamIcon>
+            <GleamIcon src={METEOR_ICON_URL} alt="" />
             <Title>拾起微光</Title>
           </TitleArea>
           <CloseButton onClick={onClose}>&times;</CloseButton>
@@ -109,7 +108,7 @@ const Overlay = styled.div`
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(8, 10, 16, 0.6);
+  background: rgba(60, 55, 45, 0.35);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: flex;
@@ -167,10 +166,9 @@ const TitleArea = styled.div`
   gap: 8px;
 `
 
-const GleamIcon = styled.svg`
+const GleamIcon = styled.img`
   width: 18px;
   height: 18px;
-  fill: ${theme.colors.text.accent};
   filter: drop-shadow(0 0 4px ${theme.colors.brand.primary});
 `
 
@@ -221,7 +219,7 @@ const SectionLabel = styled.span`
 const ExcerptText = styled.blockquote`
   margin: 0;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(200, 180, 140, 0.08);
   border-left: 3px solid ${theme.colors.brand.primary};
   border-radius: 0 8px 8px 0;
   font-size: 13.5px;
@@ -276,7 +274,7 @@ const Footer = styled.footer`
   justify-content: flex-end;
   gap: 12px;
   padding: 18px 24px;
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(200, 180, 140, 0.1);
   border-top: 1px solid ${theme.colors.border.light};
 `
 
@@ -293,7 +291,7 @@ const CancelButton = styled.button`
   transition: ${theme.animations.transition};
 
   &:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(200, 180, 140, 0.15);
     color: ${theme.colors.text.primary};
   }
 `
@@ -303,7 +301,7 @@ const SaveButton = styled.button`
   border: none;
   border-radius: 8px;
   padding: 8px 18px;
-  color: hsl(224, 25%, 10%);
+  color: hsl(45, 40%, 97%);
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
@@ -314,7 +312,7 @@ const SaveButton = styled.button`
   &:hover:not(:disabled) {
     background: ${theme.colors.brand.primaryHover};
     transform: translateY(-1px);
-    box-shadow: 0 4px 15px rgba(253, 186, 116, 0.35);
+    box-shadow: 0 4px 15px rgba(180, 140, 80, 0.4);
   }
 
   &:disabled {

@@ -1,27 +1,27 @@
 export const theme = {
   colors: {
     bg: {
-      base: 'hsl(224, 25%, 10%)',
-      card: 'rgba(28, 33, 48, 0.8)',
-      input: 'hsl(224, 22%, 14%)',
-      glass: 'rgba(16, 20, 30, 0.75)',
+      base: 'hsl(45, 40%, 97%)', // Warm paper white
+      card: 'rgba(255, 253, 248, 0.95)', // Soft cream
+      input: 'hsl(45, 30%, 99%)', // Almost white with warmth
+      glass: 'rgba(255, 252, 245, 0.85)', // Warm translucent
     },
     border: {
-      light: 'rgba(255, 255, 255, 0.08)',
-      focus: 'hsl(38, 92%, 60%)',
-      card: 'rgba(255, 255, 255, 0.05)',
+      light: 'rgba(200, 180, 140, 0.25)', // Warm gray
+      focus: 'hsl(38, 85%, 50%)', // Deep gold
+      card: 'rgba(200, 180, 140, 0.15)',
     },
     text: {
-      primary: 'hsl(210, 20%, 98%)',
-      secondary: 'hsl(210, 15%, 75%)',
-      muted: 'hsl(210, 10%, 55%)',
-      accent: 'hsl(38, 92%, 60%)', // Gleam gold
-      success: 'hsl(145, 80%, 65%)',
+      primary: 'hsl(35, 25%, 20%)', // Warm dark brown
+      secondary: 'hsl(35, 15%, 45%)', // Medium warm gray
+      muted: 'hsl(35, 12%, 60%)', // Light warm gray
+      accent: 'hsl(30, 80%, 45%)', // Amber gold
+      success: 'hsl(145, 60%, 40%)',
     },
     brand: {
-      primary: 'hsl(38, 92%, 55%)', // Gleam Warm Gold
-      primaryHover: 'hsl(38, 95%, 65%)',
-      glow: 'rgba(253, 186, 116, 0.15)',
+      primary: 'hsl(38, 85%, 48%)', // Gleam Amber Gold
+      primaryHover: 'hsl(38, 90%, 42%)', // Deeper gold
+      glow: 'rgba(218, 165, 80, 0.25)', // Warm amber glow
     },
   },
   typography: {
@@ -29,9 +29,9 @@ export const theme = {
       '"Outfit", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
   shadows: {
-    glow: '0 0 20px rgba(253, 186, 116, 0.25)',
-    card: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
-    popover: '0 12px 48px rgba(0, 0, 0, 0.5)',
+    glow: '0 0 20px rgba(218, 165, 80, 0.3)',
+    card: '0 4px 24px rgba(120, 100, 60, 0.12)',
+    popover: '0 8px 40px rgba(120, 100, 60, 0.15)',
   },
   animations: {
     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
