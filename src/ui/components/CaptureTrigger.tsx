@@ -8,8 +8,39 @@ interface CaptureTriggerProps {
   shadowHost: HTMLElement
 }
 
+type TriggerPlacement = 'above' | 'below'
+
+interface TriggerPosition {
+  x: number
+  y: number
+  placement: TriggerPlacement
+}
+
+const TRIGGER_GAP = 12
+const TRIGGER_EDGE_PADDING = 12
+const TRIGGER_MIN_ABOVE_SPACE = 52
+
+export function calculateTriggerPosition(
+  rect: Pick<DOMRect, 'top' | 'bottom' | 'left' | 'width'>,
+  viewport: { width: number; height: number },
+): TriggerPosition {
+  const placement: TriggerPlacement = rect.top >= TRIGGER_MIN_ABOVE_SPACE ? 'above' : 'below'
+
+  return {
+    x: Math.min(
+      Math.max(rect.left + rect.width / 2, TRIGGER_EDGE_PADDING),
+      viewport.width - TRIGGER_EDGE_PADDING,
+    ),
+    y:
+      placement === 'above'
+        ? rect.top - TRIGGER_GAP
+        : Math.min(rect.bottom + TRIGGER_GAP, viewport.height - TRIGGER_EDGE_PADDING),
+    placement,
+  }
+}
+
 export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
+  const [position, setPosition] = useState<TriggerPosition | null>(null)
   const [selectionText, setSelectionText] = useState('')
   const buttonRef = useRef<HTMLButtonElement>(null)
 
@@ -48,13 +79,12 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
         try {
           const range = selection.getRangeAt(0)
           const rect = range.getBoundingClientRect()
+          const nextPosition = calculateTriggerPosition(rect, {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          })
 
-          // Calculate absolute position on the viewport
-          // Place button centered above the selection
-          const x = rect.left + rect.width / 2
-          const y = rect.top + window.scrollY - 40
-
-          setPosition({ x, y })
+          setPosition(nextPosition)
           setSelectionText(text)
         } catch {
           // Range might be invalid
@@ -90,6 +120,7 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
   return (
     <FloatingButton
       ref={buttonRef}
+      data-placement={position.placement}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -128,7 +159,12 @@ const FloatingButton = styled.button`
   -webkit-backdrop-filter: blur(12px);
   z-index: 2147483647;
   transition: ${theme.animations.spring};
-  animation: floatIn 0.2s ease-out;
+  animation: floatInAbove 0.2s ease-out;
+
+  &[data-placement='below'] {
+    transform: translate(-50%, 0);
+    animation-name: floatInBelow;
+  }
 
   &:hover {
     border-color: ${theme.colors.border.focus};
@@ -137,7 +173,11 @@ const FloatingButton = styled.button`
     box-shadow: 0 0 15px ${theme.colors.brand.glow};
   }
 
-  @keyframes floatIn {
+  &[data-placement='below']:hover {
+    transform: translate(-50%, 0) scale(1.05);
+  }
+
+  @keyframes floatInAbove {
     from {
       opacity: 0;
       transform: translate(-50%, -90%) scale(0.9);
@@ -145,6 +185,17 @@ const FloatingButton = styled.button`
     to {
       opacity: 1;
       transform: translate(-50%, -100%) scale(1);
+    }
+  }
+
+  @keyframes floatInBelow {
+    from {
+      opacity: 0;
+      transform: translate(-50%, 10%) scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0) scale(1);
     }
   }
 `
