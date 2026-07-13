@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks'
 import styled from '@emotion/styled'
+import { Gleam } from '../../domain/gleam'
 import { TimelineGroup } from '../../services/timeline'
 import { GleamCard } from './GleamCard'
 import { SearchBar } from './SearchBar'
@@ -10,20 +11,22 @@ interface ReviewSidebarProps {
   isOpen: boolean
   onClose: () => void
   timelineGroups: TimelineGroup[]
-  onDeleteGleam: (id: string) => Promise<void>
+  onClickGleam: (gleam: Gleam) => void
   onRevisitGleam: (id: string) => Promise<void>
   onSearch: (query: string) => void
   onExport: () => void
+  onAddGleam: () => void
 }
 
 export function ReviewSidebar({
   isOpen,
   onClose,
+  onClickGleam,
   timelineGroups,
-  onDeleteGleam,
   onRevisitGleam,
   onSearch,
   onExport,
+  onAddGleam,
 }: ReviewSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -38,9 +41,14 @@ export function ReviewSidebar({
       <SidebarHeader>
         <HeaderTitle>
           <GleamIcon src={METEOR_ICON_URL} alt="" />
-          <span>拾光志 · 认知演化</span>
+          <span>拾光 · 认知演化的轨迹</span>
         </HeaderTitle>
         <HeaderActions>
+          <AddButton onClick={onAddGleam} title="添加拾光 (无来源)">
+            <svg viewBox="0 0 24 24">
+              <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+            </svg>
+          </AddButton>
           <ExportButton onClick={onExport} title="导出所有拾光记录 (JSON)">
             <svg viewBox="0 0 24 24">
               <path d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z" />
@@ -79,8 +87,8 @@ export function ReviewSidebar({
                     <GleamCard
                       key={gleam.id}
                       gleam={gleam}
-                      onDelete={onDeleteGleam}
                       onRevisit={onRevisitGleam}
+                      onClick={onClickGleam}
                     />
                   ))}
                 </GleamList>
@@ -149,6 +157,28 @@ const HeaderActions = styled.div`
   display: flex;
   align-items: center;
   gap: 12px;
+`
+
+const AddButton = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: ${theme.animations.transition};
+
+  svg {
+    width: 18px;
+    height: 18px;
+    fill: ${theme.colors.text.muted};
+  }
+
+  &:hover svg {
+    fill: ${theme.colors.brand.primary};
+  }
 `
 
 const ExportButton = styled.button`

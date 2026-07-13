@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks'
 import styled from '@emotion/styled'
+import { Gleam } from '../domain/gleam'
 import { IRepository } from '../domain/repository'
 import { CaptureService } from '../services/capture'
 import { TimelineService, TimelineGroup } from '../services/timeline'
@@ -20,6 +21,7 @@ export function App({ repository, shadowHost }: AppProps) {
   const [activeExcerpt, setActiveExcerpt] = useState('')
   const [timelineGroups, setTimelineGroups] = useState<TimelineGroup[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [viewingGleam, setViewingGleam] = useState<Gleam | null>(null)
 
   const captureService = new CaptureService(repository)
   const timelineService = new TimelineService(repository)
@@ -43,6 +45,7 @@ export function App({ repository, shadowHost }: AppProps) {
 
       if (isModifier && isShift && isG) {
         e.preventDefault()
+        setViewingGleam(null)
         setActiveExcerpt('')
         setIsCaptureOpen(true)
       }
@@ -53,6 +56,7 @@ export function App({ repository, shadowHost }: AppProps) {
   }, [])
 
   const handleTriggerCapture = (excerpt: string) => {
+    setViewingGleam(null)
     setActiveExcerpt(excerpt)
     setIsCaptureOpen(true)
   }
@@ -60,11 +64,19 @@ export function App({ repository, shadowHost }: AppProps) {
   const handleSaveCapture = async (thought: string) => {
     await captureService.capture(thought, activeExcerpt || undefined)
     await refreshTimeline()
+    setIsCaptureOpen(false)
+    setActiveExcerpt('')
   }
 
-  const handleDeleteGleam = async (id: string) => {
-    await repository.delete(id)
-    await refreshTimeline()
+  const handleAddGleam = () => {
+    setViewingGleam(null)
+    setActiveExcerpt('')
+    setIsCaptureOpen(true)
+  }
+
+  const handleViewGleam = (gleam: Gleam) => {
+    setViewingGleam(gleam)
+    setIsCaptureOpen(true)
   }
 
   const handleRevisitGleam = async (id: string) => {
@@ -91,6 +103,12 @@ export function App({ repository, shadowHost }: AppProps) {
     }
   }
 
+  const handleCloseCapture = () => {
+    setIsCaptureOpen(false)
+    setActiveExcerpt('')
+    setViewingGleam(null)
+  }
+
   return (
     <>
       {/* Floating trigger for text selections */}
@@ -103,15 +121,14 @@ export function App({ repository, shadowHost }: AppProps) {
         </SidebarFAB>
       )}
 
-      {/* Text Capture Panel Modal */}
+      {/* Capture Panel Modal */}
       {isCaptureOpen && (
         <CapturePanel
-          excerpt={activeExcerpt}
-          onSave={handleSaveCapture}
-          onClose={() => {
-            setIsCaptureOpen(false)
-            setActiveExcerpt('')
-          }}
+          excerpt={viewingGleam?.source.excerpt || activeExcerpt || undefined}
+          initialThought={viewingGleam?.thought || ''}
+          readOnly={!!viewingGleam}
+          onSave={viewingGleam ? undefined : handleSaveCapture}
+          onClose={handleCloseCapture}
         />
       )}
 
@@ -120,10 +137,11 @@ export function App({ repository, shadowHost }: AppProps) {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         timelineGroups={timelineGroups}
-        onDeleteGleam={handleDeleteGleam}
+        onClickGleam={handleViewGleam}
         onRevisitGleam={handleRevisitGleam}
         onSearch={setSearchQuery}
         onExport={handleExportData}
+        onAddGleam={handleAddGleam}
       />
     </>
   )
