@@ -43,6 +43,8 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
   const [position, setPosition] = useState<TriggerPosition | null>(null)
   const [selectionText, setSelectionText] = useState('')
   const buttonRef = useRef<HTMLButtonElement>(null)
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isHoveringRef = useRef(false)
 
   useEffect(() => {
     const handleMouseUp = (e: MouseEvent) => {
@@ -115,6 +117,20 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
     }
   }, [shadowHost])
 
+  // Auto-hide after 8s if mouse is not hovering
+  useEffect(() => {
+    if (!position) return
+    hideTimerRef.current = setTimeout(() => {
+      if (!isHoveringRef.current) {
+        setPosition(null)
+        setSelectionText('')
+      }
+    }, 8000)
+    return () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
+    }
+  }, [position])
+
   if (!position) return null
 
   return (
@@ -124,6 +140,12 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
+      }}
+      onMouseEnter={() => {
+        isHoveringRef.current = true
+      }}
+      onMouseLeave={() => {
+        isHoveringRef.current = false
       }}
       onClick={(e: MouseEvent) => {
         e.stopPropagation()

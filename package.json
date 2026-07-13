@@ -16,6 +16,8 @@
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "dompurify": "^3.4.12",
+    "marked": "^18.0.6",
     "preact": "^10.29.7"
   },
   "devDependencies": {

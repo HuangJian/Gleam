@@ -127,6 +127,7 @@ export function App({ repository, shadowHost }: AppProps) {
           excerpt={viewingGleam?.source.excerpt || activeExcerpt || undefined}
           initialThought={viewingGleam?.thought || ''}
           readOnly={!!viewingGleam}
+          createdAt={viewingGleam?.created_at}
           onSave={viewingGleam ? undefined : handleSaveCapture}
           onClose={handleCloseCapture}
         />

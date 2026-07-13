@@ -34,6 +34,14 @@ export function ReviewSidebar({
     onSearch(searchQuery)
   }, [searchQuery])
 
+  useEffect(() => {
+    if (!isOpen) return
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   return (
@@ -226,6 +234,7 @@ const SearchWrapper = styled.div`
 const ScrollableContent = styled.div`
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px;
   display: flex;
   flex-direction: column;

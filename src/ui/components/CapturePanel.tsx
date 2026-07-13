@@ -2,32 +2,48 @@ import { useEffect, useState, useRef } from 'preact/hooks'
 import styled from '@emotion/styled'
 import { theme } from '../theme'
 import { METEOR_ICON_URL } from '../assets'
+import { MarkdownPreview } from './MarkdownPreview'
 
 interface CapturePanelProps {
   excerpt?: string
   initialThought?: string
   readOnly?: boolean
+  createdAt?: string
   onSave?: (thought: string) => Promise<void>
   onClose: () => void
+}
+
+function formatThoughtLabel(isoString: string): string {
+  const d = new Date(isoString)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const hour = String(d.getHours()).padStart(2, '0')
+  const minute = String(d.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hour}:${minute} 的理解 (Thought)`
 }
 
 export function CapturePanel({
   excerpt,
   initialThought = '',
   readOnly = false,
+  createdAt,
   onSave,
   onClose,
 }: CapturePanelProps) {
   const [thought, setThought] = useState(initialThought)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
+  const [mode, setMode] = useState<'write' | 'preview'>('write')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    if (!readOnly) {
+    if (!readOnly && mode === 'write') {
       textareaRef.current?.focus()
     }
+  }, [mode, readOnly])
 
+  useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = ''
@@ -52,8 +68,10 @@ export function CapturePanel({
     }
   }
 
-  // Only support CMD+Enter / CTRL+Enter to save in non-readOnly mode
+  // Stop keydown from propagating to host page (e.g. GitHub shortcuts)
+  // while preserving Cmd/Ctrl+Enter to save
   const handleKeyDown = (e: KeyboardEvent) => {
+    e.stopPropagation()
     if (readOnly) return
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault()
@@ -86,18 +104,52 @@ export function CapturePanel({
 
         <Content>
           <InputSection>
-            <SectionLabel>此刻的理解 (Thought)</SectionLabel>
-            <StyledTextarea
-              ref={textareaRef}
-              placeholder={
-                readOnly ? '' : '写下你此刻真实的理解：感想、总结、类比、疑问、进展、猜测、直觉、……'
-              }
-              value={thought}
-              onInput={(e: any) => setThought((e.target as HTMLTextAreaElement).value)}
-              onKeyDown={handleKeyDown}
-              disabled={isSaving || readOnly}
-              readOnly={readOnly}
-            />
+            {readOnly ? (
+              <>
+                <SectionLabel>
+                  {createdAt ? `${formatThoughtLabel(createdAt)}` : '此刻的理解 (Thought)'}
+                </SectionLabel>
+                <ReadOnlyContent>
+                  {thought.trim() ? (
+                    <MarkdownPreview content={thought} />
+                  ) : (
+                    <EmptyHint>（无内容）</EmptyHint>
+                  )}
+                </ReadOnlyContent>
+              </>
+            ) : (
+              <>
+                <EditorToolbar>
+                  <TabGroup>
+                    <TabButton $active={mode === 'write'} onClick={() => setMode('write')}>
+                      Write
+                    </TabButton>
+                    <TabButton $active={mode === 'preview'} onClick={() => setMode('preview')}>
+                      Preview
+                    </TabButton>
+                  </TabGroup>
+                  <MarkdownHint>Markdown</MarkdownHint>
+                </EditorToolbar>
+                {mode === 'write' ? (
+                  <StyledTextarea
+                    ref={textareaRef}
+                    placeholder="写下你此刻真实的理解：感想、总结、类比、疑问、进展、猜测、直觉、…… 支持 Markdown 格式"
+                    value={thought}
+                    onInput={(e: any) => setThought((e.target as HTMLTextAreaElement).value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isSaving}
+                  />
+                ) : (
+                  <PreviewArea>
+                    {thought.trim() ? (
+                      <MarkdownPreview content={thought} />
+                    ) : (
+                      <EmptyHint>暂无内容可预览</EmptyHint>
+                    )}
+                  </PreviewArea>
+                )}
+              </>
+            )}
           </InputSection>
 
           {excerpt && (
@@ -144,7 +196,7 @@ const PanelCard = styled.div`
   max-width: 80vw;
   height: 80%;
   max-height: 80vh;
-  background: ${theme.colors.bg.glass};
+  background: ${theme.colors.bg.base};
   border: 1px solid ${theme.colors.border.light};
   border-radius: 16px;
   box-shadow: ${theme.shadows.card};
@@ -230,6 +282,7 @@ const Content = styled.div`
   gap: 20px;
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
 `
 
 const ExcerptSection = styled.div`
@@ -269,6 +322,45 @@ const InputSection = styled.div`
   min-height: 0;
 `
 
+const EditorToolbar = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+`
+
+const TabGroup = styled.div`
+  display: flex;
+  gap: 2px;
+  background: rgba(200, 180, 140, 0.1);
+  padding: 2px;
+  border-radius: 8px;
+`
+
+const TabButton = styled.button<{ $active: boolean }>`
+  background: ${(p) => (p.$active ? theme.colors.bg.card : 'transparent')};
+  border: none;
+  border-radius: 6px;
+  padding: 4px 14px;
+  color: ${(p) => (p.$active ? theme.colors.text.primary : theme.colors.text.muted)};
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: ${theme.animations.transition};
+
+  &:hover {
+    color: ${theme.colors.text.primary};
+  }
+`
+
+const MarkdownHint = styled.span`
+  font-size: 10px;
+  color: ${theme.colors.text.muted};
+  font-weight: 500;
+  letter-spacing: 0.5px;
+`
+
 const StyledTextarea = styled.textarea`
   width: 100%;
   flex: 1;
@@ -290,11 +382,36 @@ const StyledTextarea = styled.textarea`
     border-color: ${theme.colors.border.focus};
     box-shadow: 0 0 10px ${theme.colors.brand.glow};
   }
+`
 
-  &:read-only {
-    background: rgba(200, 180, 140, 0.04);
-    cursor: default;
-  }
+const PreviewArea = styled.div`
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: ${theme.colors.bg.input};
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 10px;
+  padding: 14px;
+  box-sizing: border-box;
+`
+
+const ReadOnlyContent = styled.div`
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgba(200, 180, 140, 0.04);
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 10px;
+  padding: 14px;
+  box-sizing: border-box;
+`
+
+const EmptyHint = styled.div`
+  color: ${theme.colors.text.muted};
+  font-size: 13px;
+  font-style: italic;
 `
 
 const ErrorMessage = styled.div`

@@ -20,12 +20,16 @@ export class CaptureService {
   ): Promise<string> {
     const id = generateUUIDv7()
 
-    // Auto-capture current page context if applicable
+    // Auto-capture current page context only when there's an excerpt (text selection)
+    // or a custom source — not for pure thoughts without page context
+    const hasExcerpt = !!(excerpt || customSource?.excerpt)
     const sourceUrl =
-      customSource?.url || (typeof window !== 'undefined' ? window.location.href : undefined)
+      customSource?.url ||
+      (hasExcerpt && typeof window !== 'undefined' ? window.location.href : undefined)
     const sourceTitle =
-      customSource?.title || (typeof document !== 'undefined' ? document.title : undefined)
-    const sourceType: SourceType = customSource?.type || (sourceUrl ? 'url' : 'experience')
+      customSource?.title ||
+      (hasExcerpt && typeof document !== 'undefined' ? document.title : undefined)
+    const sourceType: SourceType = customSource?.type || (sourceUrl ? 'url' : 'thought')
 
     const source: Source = {
       type: sourceType,

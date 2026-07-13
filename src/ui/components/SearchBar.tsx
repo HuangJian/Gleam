@@ -17,6 +17,7 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
         placeholder="搜索我的理解、记录与来源..."
         value={value}
         onInput={(e: any) => onChange((e.target as HTMLInputElement).value)}
+        onKeyDown={(e: KeyboardEvent) => e.stopPropagation()}
       />
 
       {value && (

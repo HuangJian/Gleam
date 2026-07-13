@@ -1,6 +1,7 @@
 import styled from '@emotion/styled'
 import { Gleam } from '../../domain/gleam'
 import { theme } from '../theme'
+import { MarkdownPreview } from './MarkdownPreview'
 
 interface GleamCardProps {
   gleam: Gleam
@@ -11,7 +12,7 @@ interface GleamCardProps {
 export function GleamCard({ gleam, onRevisit, onClick }: GleamCardProps) {
   const getFormattedTime = (isoString: string) => {
     const d = new Date(isoString)
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
   }
 
   const getSourceHost = (url?: string) => {
@@ -41,7 +42,9 @@ export function GleamCard({ gleam, onRevisit, onClick }: GleamCardProps) {
         </HeaderActions>
       </CardHeader>
 
-      <ThoughtText>{gleam.thought}</ThoughtText>
+      <ThoughtText>
+        <MarkdownPreview content={gleam.thought} compact />
+      </ThoughtText>
 
       {gleam.source.excerpt && <SourceExcerpt>" {gleam.source.excerpt} "</SourceExcerpt>}
 
@@ -128,8 +131,10 @@ const ThoughtText = styled.div`
   font-size: 14px;
   line-height: 1.6;
   color: ${theme.colors.text.primary};
-  white-space: pre-wrap;
   font-weight: 450;
+  max-height: 4.8em;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 `
 
 const SourceExcerpt = styled.blockquote`
