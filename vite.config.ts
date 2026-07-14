@@ -50,7 +50,7 @@ export default defineConfig({
         match: ['http://*/*', 'https://*/*'],
         require: REQUIRE,
         grant: ['GM_setValue', 'GM_getValue', 'GM_registerMenuCommand'],
-        runAt: 'document-idle',
+        'run-at': 'document-idle',
       },
     }),
   ],
