@@ -1,4 +1,33 @@
 import { Window } from 'happy-dom'
+import { mock } from 'bun:test'
+
+// Mock @emotion/styled: render plain HTML elements instead of styled components.
+// @emotion/react's useContext crashes under happy-dom + preact/hooks, so we
+// bypass the entire Emotion runtime. Styles are irrelevant for render tests —
+// we only care about DOM structure and interactions.
+mock.module('@emotion/styled', () => {
+  // Return the bare string tag so Preact treats <StyledDiv> as a native DOM
+  // element — this ensures ref, children, and event handlers all work
+  // correctly without forwardRef. $-prefixed transient props are harmless as
+  // extra DOM attributes in tests.
+  const proxy = new Proxy(function () {}, {
+    get(_target: unknown, tag: string) {
+      if (typeof tag !== 'string' || tag === 'then' || tag === '$$typeof') {
+        return undefined
+      }
+      return function _styledTagFactory() {
+        return tag
+      }
+    },
+    apply(_target: unknown, _thisArg: unknown, args: [string]) {
+      return function _styledCallFactory() {
+        return args[0]
+      }
+    },
+  })
+
+  return { default: proxy, __esModule: true }
+})
 
 const window = new Window()
 
@@ -19,6 +48,16 @@ Object.assign(globalThis, {
 })
 
 globalThis.getSelection = () => window.getSelection() as unknown as Selection
+
+// happy-dom does not implement HTMLElement.focus()/blur(). Add no-op stubs so
+// components that call ref.current?.focus() in useEffect don't crash.
+const HTMLElementProto = window.HTMLElement.prototype
+if (typeof HTMLElementProto.focus !== 'function') {
+  HTMLElementProto.focus = function () {}
+}
+if (typeof HTMLElementProto.blur !== 'function') {
+  HTMLElementProto.blur = function () {}
+}
 
 // Workaround for happy-dom bug (https://github.com/capricorn86/happy-dom/issues/1165
 // → #2182): `Node.prototype.nodeName` and `Node.prototype.textContent` are

@@ -1,0 +1,142 @@
+import { describe, test, expect, vi, afterEach } from 'bun:test'
+import { render, fireEvent, cleanup, waitFor } from '@testing-library/preact'
+import { ReviewRoom } from '../ui/components/ReviewRoom'
+import { TimelineGroup } from '../services/timeline'
+import { makeGleam } from './helpers'
+
+function minimalProps(overrides: Record<string, unknown> = {}) {
+  return {
+    isOpen: true,
+    onClose: vi.fn(),
+    timelineGroups: [] as TimelineGroup[],
+    onRevisitGleam: vi.fn().mockResolvedValue(undefined),
+    onSearch: vi.fn(),
+    onExport: vi.fn(),
+    onAddGleam: vi.fn(),
+    viewingGleam: null,
+    onOpenGleam: vi.fn(),
+    onCloseDetail: vi.fn(),
+    ...overrides,
+  }
+}
+
+describe('ReviewRoom', () => {
+  afterEach(cleanup)
+
+  test('renders nothing when isOpen is false', () => {
+    const { container } = render(<ReviewRoom {...minimalProps({ isOpen: false })} />)
+    expect(container.innerHTML).toBe('')
+  })
+
+  test('renders the empty state when there are no timeline groups', () => {
+    const { getByText } = render(<ReviewRoom {...minimalProps()} />)
+    expect(getByText('微光待启')).toBeTruthy()
+  })
+
+  test('renders timeline groups with gleam cards', () => {
+    const groups: TimelineGroup[] = [
+      {
+        dateLabel: 'Today',
+        gleams: [
+          makeGleam({ id: 'g1', thought: 'First insight.' }),
+          makeGleam({ id: 'g2', thought: 'Second insight.' }),
+        ],
+      },
+    ]
+    const { getByText } = render(<ReviewRoom {...minimalProps({ timelineGroups: groups })} />)
+    expect(getByText('Today')).toBeTruthy()
+    expect(getByText('First insight.')).toBeTruthy()
+    expect(getByText('Second insight.')).toBeTruthy()
+  })
+
+  test('calls onSearch when the search input changes', async () => {
+    const onSearch = vi.fn()
+    const { getByPlaceholderText } = render(<ReviewRoom {...minimalProps({ onSearch })} />)
+    fireEvent.input(getByPlaceholderText('搜索我的理解、记录与来源...'), {
+      target: { value: 'react' },
+    })
+    // The internal useEffect calls onSearch after each state change.
+    await waitFor(() => expect(onSearch).toHaveBeenCalledWith('react'))
+  })
+
+  test('calls onAddGleam when the add button is clicked', () => {
+    const onAddGleam = vi.fn()
+    const { getByTitle } = render(<ReviewRoom {...minimalProps({ onAddGleam })} />)
+    fireEvent.click(getByTitle('添加拾光 (无来源)'))
+    expect(onAddGleam).toHaveBeenCalledTimes(1)
+  })
+
+  test('calls onExport when the export button is clicked', () => {
+    const onExport = vi.fn()
+    const { getByTitle } = render(<ReviewRoom {...minimalProps({ onExport })} />)
+    fireEvent.click(getByTitle('导出所有拾光记录 (JSON)'))
+    expect(onExport).toHaveBeenCalledTimes(1)
+  })
+
+  test('calls onClose when the close button is clicked', () => {
+    const onClose = vi.fn()
+    const { getByTitle } = render(<ReviewRoom {...minimalProps({ onClose })} />)
+    fireEvent.click(getByTitle('关闭回顾'))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('clicking a gleam card calls onOpenGleam and onRevisitGleam', () => {
+    const gleam = makeGleam({ id: 'card-42', thought: 'Clickable.' })
+    const groups: TimelineGroup[] = [{ dateLabel: 'Today', gleams: [gleam] }]
+    const onOpenGleam = vi.fn()
+    const onRevisitGleam = vi.fn().mockResolvedValue(undefined)
+    const { getByText } = render(
+      <ReviewRoom {...minimalProps({ timelineGroups: groups, onOpenGleam, onRevisitGleam })} />,
+    )
+    fireEvent.click(getByText('Clickable.'))
+    expect(onOpenGleam).toHaveBeenCalledWith(gleam)
+    expect(onRevisitGleam).toHaveBeenCalledWith('card-42')
+  })
+
+  test('shows the detail overlay when viewingGleam is set', () => {
+    const gleam = makeGleam({
+      thought: 'Deep thought.',
+      source: {
+        type: 'url',
+        url: 'https://example.com',
+        title: 'Source Page',
+        excerpt: 'Context quote.',
+      },
+    })
+    const { getByText, getByTitle } = render(
+      <ReviewRoom {...minimalProps({ viewingGleam: gleam })} />,
+    )
+    // Thought is rendered via MarkdownPreview in the detail card.
+    expect(getByText('Deep thought.')).toBeTruthy()
+    // Back button.
+    expect(getByTitle('返回列表')).toBeTruthy()
+    // Source link shows the title text.
+    expect(getByText('Source Page')).toBeTruthy()
+  })
+
+  test('calls onCloseDetail when the back button in the detail view is clicked', () => {
+    const gleam = makeGleam({ thought: 'Detail.' })
+    const onCloseDetail = vi.fn()
+    const { getByTitle } = render(
+      <ReviewRoom {...minimalProps({ viewingGleam: gleam, onCloseDetail })} />,
+    )
+    fireEvent.click(getByTitle('返回列表'))
+    expect(onCloseDetail).toHaveBeenCalledTimes(1)
+  })
+
+  test('calls onCloseDetail when clicking the detail overlay backdrop', () => {
+    const gleam = makeGleam({ thought: 'Backdrop test.' })
+    const onCloseDetail = vi.fn()
+    const { getByTestId } = render(
+      <ReviewRoom {...minimalProps({ viewingGleam: gleam, onCloseDetail })} />,
+    )
+    // The detail overlay is the first child of the fragment after the main
+    // review room. We can find it by clicking on the overlay element that
+    // wraps the detail card. The DetailOverlay has onClick={onCloseDetail}.
+    // We click the overlay itself, not the card inside it.
+    const detailOverlay = getByTestId('review-room').nextSibling as HTMLElement
+    expect(detailOverlay).toBeTruthy()
+    fireEvent.click(detailOverlay)
+    expect(onCloseDetail).toHaveBeenCalledTimes(1)
+  })
+})
