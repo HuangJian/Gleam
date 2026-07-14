@@ -69,11 +69,11 @@ export function marginsToPos(
   return { x: vp.width - m.right - size, y: vp.height - m.bottom - size }
 }
 
-interface SidebarFABProps {
+interface ReviewFABProps {
   onClick: () => void
 }
 
-export function SidebarFAB({ onClick }: SidebarFABProps) {
+export function ReviewFAB({ onClick }: ReviewFABProps) {
   const [pos, setPos] = useState<FabPos>(() => {
     const vp = { width: window.innerWidth, height: window.innerHeight }
     const saved = loadFabPosition(location.hostname)
@@ -162,8 +162,8 @@ export function SidebarFAB({ onClick }: SidebarFABProps) {
   return (
     <FloatingButton
       type="button"
-      title="打开拾光志（可拖动到任意边缘）"
-      aria-label="打开拾光志"
+      title="打开拾光 · 全屏回顾（可拖动到任意边缘）"
+      aria-label="打开拾光 · 全屏回顾"
       style={{
         left: `${pos.x}px`,
         top: `${pos.y}px`,

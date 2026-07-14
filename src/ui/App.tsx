@@ -5,8 +5,8 @@ import { CaptureService } from '../services/capture'
 import { TimelineService, TimelineGroup } from '../services/timeline'
 import { CaptureTrigger } from './components/CaptureTrigger'
 import { CapturePanel } from './components/CapturePanel'
-import { ReviewSidebar } from './components/ReviewSidebar'
-import { SidebarFAB } from './components/SidebarFAB'
+import { ReviewRoom } from './components/ReviewRoom'
+import { ReviewFAB } from './components/ReviewFAB'
 import { SourceMedia } from '../domain/gleam'
 
 interface AppProps {
@@ -16,7 +16,7 @@ interface AppProps {
 
 export function App({ repository, shadowHost }: AppProps) {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isReviewOpen, setIsReviewOpen] = useState(false)
   const [activeExcerpt, setActiveExcerpt] = useState('')
   const [activeMedia, setActiveMedia] = useState<SourceMedia | undefined>(undefined)
   const [timelineGroups, setTimelineGroups] = useState<TimelineGroup[]>([])
@@ -83,7 +83,6 @@ export function App({ repository, shadowHost }: AppProps) {
 
   const handleViewGleam = (gleam: Gleam) => {
     setViewingGleam(gleam)
-    setIsCaptureOpen(true)
   }
 
   const handleRevisitGleam = async (id: string) => {
@@ -121,32 +120,31 @@ export function App({ repository, shadowHost }: AppProps) {
       {/* Floating trigger for text selections */}
       <CaptureTrigger onTrigger={handleTriggerCapture} shadowHost={shadowHost} />
 
-      {/* Floating Action Button (FAB) to open sidebar — draggable, snaps to edge */}
-      {!isSidebarOpen && <SidebarFAB onClick={() => setIsSidebarOpen(true)} />}
+      {/* Floating Action Button (FAB) to open the full-screen review — draggable, snaps to edge */}
+      {!isReviewOpen && <ReviewFAB onClick={() => setIsReviewOpen(true)} />}
 
       {/* Capture Panel Modal */}
       {isCaptureOpen && (
         <CapturePanel
-          media={viewingGleam?.source.media || activeMedia}
-          excerpt={viewingGleam?.source.excerpt || activeExcerpt || undefined}
-          initialThought={viewingGleam?.thought || ''}
-          readOnly={!!viewingGleam}
-          createdAt={viewingGleam?.created_at}
-          onSave={viewingGleam ? undefined : handleSaveCapture}
+          media={activeMedia}
+          excerpt={activeExcerpt || undefined}
+          onSave={handleSaveCapture}
           onClose={handleCloseCapture}
         />
       )}
 
-      {/* Timeline Review Sidebar */}
-      <ReviewSidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
+      {/* Full-screen Review Room */}
+      <ReviewRoom
+        isOpen={isReviewOpen}
+        onClose={() => setIsReviewOpen(false)}
         timelineGroups={timelineGroups}
-        onClickGleam={handleViewGleam}
         onRevisitGleam={handleRevisitGleam}
         onSearch={setSearchQuery}
         onExport={handleExportData}
         onAddGleam={handleAddGleam}
+        viewingGleam={viewingGleam}
+        onOpenGleam={handleViewGleam}
+        onCloseDetail={() => setViewingGleam(null)}
       />
     </>
   )

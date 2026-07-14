@@ -156,7 +156,7 @@ src/
   ui/                  Preact + @emotion/styled components (rendered in Shadow DOM).
     App.tsx            Root component: orchestrates capture, sidebar, search, export.
     theme.ts           Design tokens (dark theme, warm gold accents).
-    components/        CapturePanel, CaptureTrigger, GleamCard, ReviewSidebar, SearchBar.
+    components/        CapturePanel, CaptureTrigger, GleamCard, ReviewRoom, ReviewFAB, SearchBar.
   utils/
     uuid.ts            UUID v7 generation (time-ordered, zero-dependency).
 

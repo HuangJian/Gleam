@@ -10,20 +10,8 @@ interface CapturePanelProps {
   excerpt?: string
   media?: SourceMedia
   initialThought?: string
-  readOnly?: boolean
-  createdAt?: string
   onSave?: (thought: string) => Promise<void>
   onClose: () => void
-}
-
-function formatThoughtLabel(isoString: string): string {
-  const d = new Date(isoString)
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const hour = String(d.getHours()).padStart(2, '0')
-  const minute = String(d.getMinutes()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hour}:${minute} 的理解 (Thought)`
 }
 
 function escapeHtml(s: string): string {
@@ -55,8 +43,6 @@ export function CapturePanel({
   excerpt,
   media,
   initialThought = '',
-  readOnly = false,
-  createdAt,
   onSave,
   onClose,
 }: CapturePanelProps) {
@@ -68,10 +54,10 @@ export function CapturePanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    if (!readOnly && mode === 'write') {
+    if (mode === 'write') {
       textareaRef.current?.focus()
     }
-  }, [mode, readOnly])
+  }, [mode])
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -81,7 +67,6 @@ export function CapturePanel({
   }, [])
 
   const handleSave = async () => {
-    if (readOnly) return
     if (!thought.trim()) {
       setError('理解内容不能为空')
       return
@@ -102,7 +87,6 @@ export function CapturePanel({
   // while preserving Cmd/Ctrl+Enter to save
   const handleKeyDown = (e: KeyboardEvent) => {
     e.stopPropagation()
-    if (readOnly) return
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault()
       handleSave()
@@ -110,7 +94,7 @@ export function CapturePanel({
   }
 
   return (
-    <Overlay onClick={readOnly ? onClose : undefined}>
+    <Overlay>
       <PanelCard onClick={(e: MouseEvent) => e.stopPropagation()}>
         <Header>
           <TitleArea>
@@ -118,85 +102,65 @@ export function CapturePanel({
             <Title>微光拾起，沉淀于岁月后，将再次闪耀智慧光芒</Title>
           </TitleArea>
           <HeaderActions>
-            {!readOnly && (
-              <>
-                <CancelButton onClick={onClose} disabled={isSaving}>
-                  取消
-                </CancelButton>
-                <SaveButton onClick={handleSave} disabled={isSaving || !thought.trim()}>
-                  {isSaving ? '保存中...' : '拾取'}
-                </SaveButton>
-              </>
-            )}
-            {readOnly && <CloseButton onClick={onClose}>&times;</CloseButton>}
+            <CancelButton onClick={onClose} disabled={isSaving}>
+              取消
+            </CancelButton>
+            <SaveButton onClick={handleSave} disabled={isSaving || !thought.trim()}>
+              {isSaving ? '保存中...' : '拾取'}
+            </SaveButton>
           </HeaderActions>
         </Header>
 
         <Content>
           <InputSection>
-            {readOnly ? (
-              <>
-                <SectionLabel>
-                  {createdAt ? `${formatThoughtLabel(createdAt)}` : '此刻的理解 (Thought)'}
-                </SectionLabel>
-                <ReadOnlyContent>
+            <>
+              <EditorToolbar>
+                <TabGroup>
+                  <TabButton $active={mode === 'write'} onClick={() => setMode('write')}>
+                    Write
+                  </TabButton>
+                  <TabButton $active={mode === 'preview'} onClick={() => setMode('preview')}>
+                    Preview
+                  </TabButton>
+                </TabGroup>
+                <IndentToggle
+                  type="button"
+                  $active={showIndent}
+                  onClick={() => setShowIndent((v) => !v)}
+                  title="显示行首缩进（用于软换行续行）"
+                  aria-pressed={showIndent}
+                >
+                  <input type="checkbox" checked={showIndent} readOnly tabIndex={-1} />␣ 缩进
+                </IndentToggle>
+              </EditorToolbar>
+              {mode === 'write' ? (
+                <EditorWrap>
+                  <StyledTextarea
+                    ref={textareaRef}
+                    $ghost={showIndent}
+                    placeholder="写下你此刻真实的理解：感想、总结、类比、疑问、进展、猜测、直觉、…… 支持 Markdown 格式"
+                    value={thought}
+                    onInput={(e: any) => setThought((e.target as HTMLTextAreaElement).value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isSaving}
+                  />
+                  {showIndent && (
+                    <IndentOverlay
+                      aria-hidden="true"
+                      dangerouslySetInnerHTML={{ __html: buildIndentOverlayHtml(thought) }}
+                    />
+                  )}
+                </EditorWrap>
+              ) : (
+                <PreviewArea>
                   {thought.trim() ? (
                     <MarkdownPreview content={thought} />
                   ) : (
-                    <EmptyHint>（无内容）</EmptyHint>
+                    <EmptyHint>暂无内容可预览</EmptyHint>
                   )}
-                </ReadOnlyContent>
-              </>
-            ) : (
-              <>
-                <EditorToolbar>
-                  <TabGroup>
-                    <TabButton $active={mode === 'write'} onClick={() => setMode('write')}>
-                      Write
-                    </TabButton>
-                    <TabButton $active={mode === 'preview'} onClick={() => setMode('preview')}>
-                      Preview
-                    </TabButton>
-                  </TabGroup>
-                  <IndentToggle
-                    type="button"
-                    $active={showIndent}
-                    onClick={() => setShowIndent((v) => !v)}
-                    title="显示行首缩进（用于软换行续行）"
-                    aria-pressed={showIndent}
-                  >
-                    <input type="checkbox" checked={showIndent} readOnly tabIndex={-1} />␣ 缩进
-                  </IndentToggle>
-                </EditorToolbar>
-                {mode === 'write' ? (
-                  <EditorWrap>
-                    <StyledTextarea
-                      ref={textareaRef}
-                      $ghost={showIndent}
-                      placeholder="写下你此刻真实的理解：感想、总结、类比、疑问、进展、猜测、直觉、…… 支持 Markdown 格式"
-                      value={thought}
-                      onInput={(e: any) => setThought((e.target as HTMLTextAreaElement).value)}
-                      onKeyDown={handleKeyDown}
-                      disabled={isSaving}
-                    />
-                    {showIndent && (
-                      <IndentOverlay
-                        aria-hidden="true"
-                        dangerouslySetInnerHTML={{ __html: buildIndentOverlayHtml(thought) }}
-                      />
-                    )}
-                  </EditorWrap>
-                ) : (
-                  <PreviewArea>
-                    {thought.trim() ? (
-                      <MarkdownPreview content={thought} />
-                    ) : (
-                      <EmptyHint>暂无内容可预览</EmptyHint>
-                    )}
-                  </PreviewArea>
-                )}
-              </>
-            )}
+                </PreviewArea>
+              )}
+            </>
           </InputSection>
 
           {excerpt && (
@@ -308,21 +272,6 @@ const HeaderActions = styled.div`
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
-`
-
-const CloseButton = styled.button`
-  background: none;
-  border: none;
-  color: ${theme.colors.text.muted};
-  font-size: 24px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  transition: ${theme.animations.transition};
-
-  &:hover {
-    color: ${theme.colors.text.primary};
-  }
 `
 
 const Content = styled.div`
@@ -506,18 +455,6 @@ const PreviewArea = styled.div`
   overflow-y: auto;
   overscroll-behavior: contain;
   background: ${theme.colors.bg.input};
-  border: 1px solid ${theme.colors.border.light};
-  border-radius: 10px;
-  padding: 14px;
-  box-sizing: border-box;
-`
-
-const ReadOnlyContent = styled.div`
-  flex: 1;
-  min-height: 120px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background: rgba(200, 180, 140, 0.04);
   border: 1px solid ${theme.colors.border.light};
   border-radius: 10px;
   padding: 14px;

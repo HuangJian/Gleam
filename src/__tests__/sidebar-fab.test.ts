@@ -5,7 +5,7 @@ import {
   defaultFabPos,
   posToMargins,
   marginsToPos,
-} from '../ui/components/SidebarFAB'
+} from '../ui/components/ReviewFAB'
 
 const vp = { width: 1000, height: 800 }
 
