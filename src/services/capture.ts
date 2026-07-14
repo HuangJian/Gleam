@@ -36,6 +36,7 @@ export class CaptureService {
       url: sourceUrl,
       title: sourceTitle,
       excerpt: excerpt || customSource?.excerpt,
+      media: customSource?.media,
     }
 
     const newGleam = createGleam(id, thought, source)

@@ -1,10 +1,18 @@
 export type SourceType = 'url' | 'book' | 'conversation' | 'experience' | 'thought'
 
+export type MediaKind = 'image' | 'audio' | 'video'
+
+export interface SourceMedia {
+  kind: MediaKind
+  src: string
+}
+
 export interface Source {
   type: SourceType
   url?: string
   title?: string
   excerpt?: string
+  media?: SourceMedia
 }
 
 export interface Gleam {
@@ -44,6 +52,7 @@ export function createGleam(
       url: source.url,
       title: source.title,
       excerpt: source.excerpt?.trim(),
+      media: source.media,
     },
     created_at: createdAt || new Date().toISOString(),
     tags: [],

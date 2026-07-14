@@ -9,6 +9,7 @@ import { CapturePanel } from './components/CapturePanel'
 import { ReviewSidebar } from './components/ReviewSidebar'
 import { theme } from './theme'
 import { METEOR_ICON_URL } from './assets'
+import { SourceMedia } from '../domain/gleam'
 
 interface AppProps {
   repository: IRepository
@@ -19,6 +20,7 @@ export function App({ repository, shadowHost }: AppProps) {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [activeExcerpt, setActiveExcerpt] = useState('')
+  const [activeMedia, setActiveMedia] = useState<SourceMedia | undefined>(undefined)
   const [timelineGroups, setTimelineGroups] = useState<TimelineGroup[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [viewingGleam, setViewingGleam] = useState<Gleam | null>(null)
@@ -55,22 +57,29 @@ export function App({ repository, shadowHost }: AppProps) {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
   }, [])
 
-  const handleTriggerCapture = (excerpt: string) => {
+  const handleTriggerCapture = (payload: { excerpt?: string; media?: SourceMedia }) => {
     setViewingGleam(null)
-    setActiveExcerpt(excerpt)
+    setActiveExcerpt(payload.excerpt || '')
+    setActiveMedia(payload.media)
     setIsCaptureOpen(true)
   }
 
   const handleSaveCapture = async (thought: string) => {
-    await captureService.capture(thought, activeExcerpt || undefined)
+    await captureService.capture(
+      thought,
+      activeExcerpt || undefined,
+      activeMedia ? { media: activeMedia, url: activeMedia.src, title: document.title } : undefined,
+    )
     await refreshTimeline()
     setIsCaptureOpen(false)
     setActiveExcerpt('')
+    setActiveMedia(undefined)
   }
 
   const handleAddGleam = () => {
     setViewingGleam(null)
     setActiveExcerpt('')
+    setActiveMedia(undefined)
     setIsCaptureOpen(true)
   }
 
@@ -124,6 +133,7 @@ export function App({ repository, shadowHost }: AppProps) {
       {/* Capture Panel Modal */}
       {isCaptureOpen && (
         <CapturePanel
+          media={viewingGleam?.source.media || activeMedia}
           excerpt={viewingGleam?.source.excerpt || activeExcerpt || undefined}
           initialThought={viewingGleam?.thought || ''}
           readOnly={!!viewingGleam}

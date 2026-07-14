@@ -2,6 +2,7 @@ import styled from '@emotion/styled'
 import { Gleam } from '../../domain/gleam'
 import { theme } from '../theme'
 import { MarkdownPreview } from './MarkdownPreview'
+import { MediaPreview } from './MediaPreview'
 
 interface GleamCardProps {
   gleam: Gleam
@@ -47,6 +48,8 @@ export function GleamCard({ gleam, onRevisit, onClick }: GleamCardProps) {
       </ThoughtText>
 
       {gleam.source.excerpt && <SourceExcerpt>" {gleam.source.excerpt} "</SourceExcerpt>}
+
+      {gleam.source.media && <MediaPreview media={gleam.source.media} compact />}
 
       {gleam.source.url && (
         <SourceFooter>

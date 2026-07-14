@@ -52,4 +52,30 @@ describe('Gleam Domain Model', () => {
     expect(() => createGleam(id, '', source)).toThrow('Thought cannot be empty')
     expect(() => createGleam(id, '   ', source)).toThrow('Thought cannot be empty')
   })
+
+  test('should preserve a media source anchor when provided', () => {
+    const id = generateUUIDv7()
+    const source = {
+      type: 'url' as const,
+      url: 'https://example.com/photo.png',
+      title: 'Example Page',
+      media: { kind: 'image' as const, src: 'https://example.com/photo.png' },
+    }
+
+    const gleam = createGleam(id, 'A visual insight.', source)
+
+    expect(gleam.source.media).toEqual({
+      kind: 'image',
+      src: 'https://example.com/photo.png',
+    })
+  })
+
+  test('should leave media undefined when no media is provided', () => {
+    const id = generateUUIDv7()
+    const source = { type: 'url' as const, url: 'https://example.com' }
+
+    const gleam = createGleam(id, 'A thought.', source)
+
+    expect(gleam.source.media).toBeUndefined()
+  })
 })

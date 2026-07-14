@@ -2,9 +2,10 @@ import { useEffect, useState, useRef } from 'preact/hooks'
 import styled from '@emotion/styled'
 import { theme } from '../theme'
 import { METEOR_ICON_URL } from '../assets'
+import { SourceMedia } from '../../domain/gleam'
 
 interface CaptureTriggerProps {
-  onTrigger: (excerpt: string) => void
+  onTrigger: (payload: { excerpt?: string; media?: SourceMedia }) => void
   shadowHost: HTMLElement
 }
 
@@ -39,15 +40,45 @@ export function calculateTriggerPosition(
   }
 }
 
+/**
+ * Returns a media anchor for a right-clicked element, or undefined if the
+ * target is not a capturable media element. Uses `currentSrc` when available so
+ * that resolved sources (e.g. <video> poster frames / source resolution) win.
+ */
+export function detectMediaTarget(target: EventTarget | null): SourceMedia | undefined {
+  if (!(target instanceof HTMLElement)) return undefined
+  if (target instanceof HTMLImageElement) {
+    return { kind: 'image', src: target.currentSrc || target.src }
+  }
+  if (target instanceof HTMLVideoElement) {
+    return { kind: 'video', src: target.currentSrc || target.src }
+  }
+  if (target instanceof HTMLAudioElement) {
+    return { kind: 'audio', src: target.currentSrc || target.src }
+  }
+  return undefined
+}
+
 export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
   const [position, setPosition] = useState<TriggerPosition | null>(null)
   const [selectionText, setSelectionText] = useState('')
+  const [mediaPayload, setMediaPayload] = useState<SourceMedia | undefined>(undefined)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isHoveringRef = useRef(false)
+
+  const clearTrigger = () => {
+    setPosition(null)
+    setSelectionText('')
+    setMediaPayload(undefined)
+  }
 
   useEffect(() => {
     const handleMouseUp = (e: MouseEvent) => {
+      // Only react to left-button selections; right-click is the media
+      // capture gesture and must not clear an already-shown media trigger.
+      if (e.button !== 0) return
       // Ignore clicks inside our own shadow host
       if (shadowHost.contains(e.target as Node)) {
         return
@@ -60,8 +91,7 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
 
         const text = selection.toString().trim()
         if (!text) {
-          setPosition(null)
-          setSelectionText('')
+          clearTrigger()
           return
         }
 
@@ -73,8 +103,7 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
             activeEl.tagName === 'TEXTAREA' ||
             (activeEl as HTMLElement).isContentEditable)
         ) {
-          setPosition(null)
-          setSelectionText('')
+          clearTrigger()
           return
         }
 
@@ -90,8 +119,7 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
           setSelectionText(text)
         } catch {
           // Range might be invalid
-          setPosition(null)
-          setSelectionText('')
+          clearTrigger()
         }
       }, 50)
     }
@@ -101,19 +129,81 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
       if (buttonRef.current?.contains(e.target as Node)) {
         return
       }
-      // Ignore clicks inside our own shadow host
-      if (shadowHost.contains(e.target as Node)) {
+      // Clicks inside our shadow DOM are retargeted to the host element when
+      // observed from the document, so treat the host itself as "inside".
+      if (e.target === shadowHost || shadowHost.contains(e.target as Node)) {
         return
       }
-      setPosition(null)
+      clearTrigger()
+    }
+
+    // Hover-dwell: show the capture button after the pointer rests on a media
+    // element for a short delay. Avoids hijacking the native context menu.
+    const startDwell = (target: EventTarget | null) => {
+      const media = detectMediaTarget(target)
+      if (!media) return
+      if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current)
+      dwellTimerRef.current = setTimeout(() => {
+        const el = target as HTMLElement
+        const rect = el.getBoundingClientRect()
+        const nextPosition = calculateTriggerPosition(rect, {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        })
+        setPosition(nextPosition)
+        setSelectionText('')
+        setMediaPayload(media)
+      }, 1600)
+    }
+
+    const cancelDwell = () => {
+      if (dwellTimerRef.current) {
+        clearTimeout(dwellTimerRef.current)
+        dwellTimerRef.current = null
+      }
+    }
+
+    const handleMouseOver = (e: MouseEvent) => {
+      if (shadowHost.contains(e.target as Node)) return
+      // Only (re)start dwell when entering a media element, not on every
+      // mousemove inside it.
+      if (e.target === lastHoverTarget) return
+      lastHoverTarget = e.target as HTMLElement
+      cancelDwell()
+      startDwell(e.target)
+    }
+
+    const handleMouseOut = (e: MouseEvent) => {
+      // Fired when leaving any element; only act if we're leaving the page
+      // entirely or moving to a non-media element.
+      const related = e.relatedTarget as Node | null
+      if (related && detectMediaTarget(related)) return
+      lastHoverTarget = null
+      cancelDwell()
+    }
+
+    let lastHoverTarget: HTMLElement | null = null
+
+    // Scrolling invalidates the button's fixed position relative to the
+    // element, so dismiss and reset dwell.
+    const handleScroll = () => {
+      cancelDwell()
+      clearTrigger()
     }
 
     document.addEventListener('mouseup', handleMouseUp)
     document.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('mouseover', handleMouseOver)
+    document.addEventListener('mouseout', handleMouseOut)
+    window.addEventListener('scroll', handleScroll, true)
 
     return () => {
       document.removeEventListener('mouseup', handleMouseUp)
       document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('mouseover', handleMouseOver)
+      document.removeEventListener('mouseout', handleMouseOut)
+      window.removeEventListener('scroll', handleScroll, true)
+      cancelDwell()
     }
   }, [shadowHost])
 
@@ -122,8 +212,7 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
     if (!position) return
     hideTimerRef.current = setTimeout(() => {
       if (!isHoveringRef.current) {
-        setPosition(null)
-        setSelectionText('')
+        clearTrigger()
       }
     }, 8000)
     return () => {
@@ -147,10 +236,13 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
       onMouseLeave={() => {
         isHoveringRef.current = false
       }}
-      onClick={(e: MouseEvent) => {
+      onMouseDown={(e: MouseEvent) => {
         e.stopPropagation()
-        onTrigger(selectionText)
+        e.preventDefault()
+        onTrigger({ excerpt: selectionText || undefined, media: mediaPayload })
         setPosition(null)
+        setSelectionText('')
+        setMediaPayload(undefined)
         // Clear window selection
         window.getSelection()?.removeAllRanges()
       }}

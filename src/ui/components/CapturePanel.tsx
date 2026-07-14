@@ -3,9 +3,12 @@ import styled from '@emotion/styled'
 import { theme } from '../theme'
 import { METEOR_ICON_URL } from '../assets'
 import { MarkdownPreview } from './MarkdownPreview'
+import { MediaPreview } from './MediaPreview'
+import { SourceMedia } from '../../domain/gleam'
 
 interface CapturePanelProps {
   excerpt?: string
+  media?: SourceMedia
   initialThought?: string
   readOnly?: boolean
   createdAt?: string
@@ -50,6 +53,7 @@ function buildIndentOverlayHtml(text: string): string {
 
 export function CapturePanel({
   excerpt,
+  media,
   initialThought = '',
   readOnly = false,
   createdAt,
@@ -202,6 +206,8 @@ export function CapturePanel({
             </ExcerptSection>
           )}
 
+          {media && <MediaPreview media={media} />}
+
           {error && <ErrorMessage>{error}</ErrorMessage>}
         </Content>
       </PanelCard>
@@ -235,6 +241,7 @@ const Overlay = styled.div`
 `
 
 const PanelCard = styled.div`
+  --gleam-modal-height: 80vh;
   width: 80%;
   max-width: 80vw;
   height: 80%;
