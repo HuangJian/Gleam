@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'preact/hooks'
-import styled from '@emotion/styled'
 import { Gleam } from '../domain/gleam'
 import { IRepository } from '../domain/repository'
 import { CaptureService } from '../services/capture'
@@ -7,8 +6,7 @@ import { TimelineService, TimelineGroup } from '../services/timeline'
 import { CaptureTrigger } from './components/CaptureTrigger'
 import { CapturePanel } from './components/CapturePanel'
 import { ReviewSidebar } from './components/ReviewSidebar'
-import { theme } from './theme'
-import { METEOR_ICON_URL } from './assets'
+import { SidebarFAB } from './components/SidebarFAB'
 import { SourceMedia } from '../domain/gleam'
 
 interface AppProps {
@@ -123,12 +121,8 @@ export function App({ repository, shadowHost }: AppProps) {
       {/* Floating trigger for text selections */}
       <CaptureTrigger onTrigger={handleTriggerCapture} shadowHost={shadowHost} />
 
-      {/* Floating Action Button (FAB) to open sidebar */}
-      {!isSidebarOpen && (
-        <SidebarFAB onClick={() => setIsSidebarOpen(true)} title="打开拾光志">
-          <GleamIcon src={METEOR_ICON_URL} alt="" />
-        </SidebarFAB>
-      )}
+      {/* Floating Action Button (FAB) to open sidebar — draggable, snaps to edge */}
+      {!isSidebarOpen && <SidebarFAB onClick={() => setIsSidebarOpen(true)} />}
 
       {/* Capture Panel Modal */}
       {isCaptureOpen && (
@@ -157,35 +151,3 @@ export function App({ repository, shadowHost }: AppProps) {
     </>
   )
 }
-
-const SidebarFAB = styled.button`
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: ${theme.colors.bg.glass};
-  border: 1px solid ${theme.colors.border.light};
-  box-shadow: ${theme.shadows.glow};
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2147483645;
-  transition: ${theme.animations.spring};
-
-  &:hover {
-    border-color: ${theme.colors.border.focus};
-    transform: scale(1.1) translateY(-2px);
-    box-shadow: 0 0 25px ${theme.colors.brand.primary};
-  }
-`
-
-const GleamIcon = styled.img`
-  width: 20px;
-  height: 20px;
-  filter: drop-shadow(0 0 4px ${theme.colors.brand.primary});
-`

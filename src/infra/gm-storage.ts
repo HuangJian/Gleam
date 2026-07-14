@@ -4,6 +4,53 @@ import { IRepository } from '../domain/repository'
 declare function GM_getValue<T>(key: string, defaultValue?: T): T
 declare function GM_setValue<T>(key: string, value: T): void
 
+const FAB_POSITIONS_KEY = 'gleam_fab_positions'
+
+/** Stored as margins from the right/bottom edges so the FAB stays put across
+ *  viewport sizes. */
+export interface FabMargins {
+  right: number
+  bottom: number
+}
+
+type FabMarginMap = Record<string, FabMargins>
+
+/** Reads the persisted FAB margins for a domain, or undefined if none saved. */
+export function loadFabPosition(domain: string): FabMargins | undefined {
+  try {
+    const map = GM_getValue<FabMarginMap>(FAB_POSITIONS_KEY, {})
+    const m = map[domain]
+    if (m && typeof m.right === 'number' && typeof m.bottom === 'number') return m
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Persists the FAB margins for a domain so they survive page reloads. */
+export function saveFabPosition(domain: string, margins: FabMargins): void {
+  try {
+    const map = GM_getValue<FabMarginMap>(FAB_POSITIONS_KEY, {})
+    map[domain] = margins
+    GM_setValue(FAB_POSITIONS_KEY, map)
+  } catch (e) {
+    console.warn('[gleam] Failed to persist FAB position:', e)
+  }
+}
+
+/** Removes a domain's stored FAB position (e.g. when it returns to default). */
+export function clearFabPosition(domain: string): void {
+  try {
+    const map = GM_getValue<FabMarginMap>(FAB_POSITIONS_KEY, {})
+    if (domain in map) {
+      delete map[domain]
+      GM_setValue(FAB_POSITIONS_KEY, map)
+    }
+  } catch (e) {
+    console.warn('[gleam] Failed to clear FAB position:', e)
+  }
+}
+
 export class GMStorageAdapter implements IRepository {
   private readonly STORAGE_KEY = 'gleam_records'
 
