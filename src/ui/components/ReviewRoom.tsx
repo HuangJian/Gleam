@@ -57,9 +57,9 @@ export function ReviewRoom({
   }
 
   return (
-    <>
-      <Overlay data-testid="review-room">
-        <ReadingColumn>
+    <Overlay data-testid="review-room">
+      <Layout>
+        <ListColumn>
           <Header>
             <HeaderTitle>
               <GleamIcon src={METEOR_ICON_URL} alt="" />
@@ -109,6 +109,7 @@ export function ReviewRoom({
                         <GleamCard
                           key={gleam.id}
                           gleam={gleam}
+                          selected={viewingGleam?.id === gleam.id}
                           onRevisit={onRevisitGleam}
                           onClick={handleCardClick}
                         />
@@ -119,65 +120,70 @@ export function ReviewRoom({
               </TimelineList>
             )}
           </ScrollableContent>
-        </ReadingColumn>
-      </Overlay>
+        </ListColumn>
 
-      {viewingGleam && (
-        <DetailOverlay onClick={onCloseDetail}>
-          <DetailCard onClick={(e: MouseEvent) => e.stopPropagation()}>
-            <DetailHeader>
-              <BackButton onClick={onCloseDetail} title="返回列表">
-                <svg viewBox="0 0 24 24">
-                  <path d="M20,11V13H8L13.5,18.5L12,20L4,12L12,4L13.5,5.5L8,11H20Z" />
-                </svg>
-              </BackButton>
-              <DetailMeta>
-                <DetailTime>{formatReviewTime(viewingGleam.created_at)}</DetailTime>
-                {viewingGleam.revisit_count && viewingGleam.revisit_count > 0 ? (
-                  <RevisitBadge title={`回顾次数: ${viewingGleam.revisit_count}`}>
-                    👁 {viewingGleam.revisit_count}
-                  </RevisitBadge>
-                ) : null}
-              </DetailMeta>
-              <CloseButton onClick={onCloseDetail} title="关闭">
-                &times;
-              </CloseButton>
-            </DetailHeader>
+        <DetailColumn>
+          {viewingGleam ? (
+            <>
+              <DetailHeader>
+                <BackButton onClick={onCloseDetail} title="返回列表">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M20,11V13H8L13.5,18.5L12,20L4,12L12,4L13.5,5.5L8,11H20Z" />
+                  </svg>
+                </BackButton>
+                <DetailMeta>
+                  <DetailTime>{formatReviewTime(viewingGleam.created_at)}</DetailTime>
+                  {viewingGleam.revisit_count && viewingGleam.revisit_count > 0 ? (
+                    <RevisitBadge title={`回顾次数: ${viewingGleam.revisit_count}`}>
+                      👁 {viewingGleam.revisit_count}
+                    </RevisitBadge>
+                  ) : null}
+                </DetailMeta>
+                <DetailCloseButton onClick={onCloseDetail} title="关闭详情">
+                  &times;
+                </DetailCloseButton>
+              </DetailHeader>
 
-            <DetailContent>
-              <ThoughtText>
-                <MarkdownPreview content={viewingGleam.thought} />
-              </ThoughtText>
+              <DetailContent>
+                <ThoughtText>
+                  <MarkdownPreview content={viewingGleam.thought} />
+                </ThoughtText>
 
-              {viewingGleam.source.excerpt && (
-                <SourceExcerpt>" {viewingGleam.source.excerpt} "</SourceExcerpt>
-              )}
+                {viewingGleam.source.excerpt && (
+                  <SourceExcerpt>" {viewingGleam.source.excerpt} "</SourceExcerpt>
+                )}
 
-              {viewingGleam.source.media && <MediaPreview media={viewingGleam.source.media} />}
+                {viewingGleam.source.media && <MediaPreview media={viewingGleam.source.media} />}
 
-              {viewingGleam.source.url && (
-                <SourceFooter>
-                  <SourceIcon viewBox="0 0 24 24">
-                    <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z" />
-                  </SourceIcon>
-                  <LinkAnchor
-                    href={viewingGleam.source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={viewingGleam.source.url}
-                  >
-                    {viewingGleam.source.title ||
-                      getSourceHost(viewingGleam.source.url) ||
-                      '原始页面'}
-                  </LinkAnchor>
-                  <SourceHost>{getSourceHost(viewingGleam.source.url)}</SourceHost>
-                </SourceFooter>
-              )}
-            </DetailContent>
-          </DetailCard>
-        </DetailOverlay>
-      )}
-    </>
+                {viewingGleam.source.url && (
+                  <SourceFooter>
+                    <SourceIcon viewBox="0 0 24 24">
+                      <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z" />
+                    </SourceIcon>
+                    <LinkAnchor
+                      href={viewingGleam.source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={viewingGleam.source.url}
+                    >
+                      {viewingGleam.source.title ||
+                        getSourceHost(viewingGleam.source.url) ||
+                        '原始页面'}
+                    </LinkAnchor>
+                    <SourceHost>{getSourceHost(viewingGleam.source.url)}</SourceHost>
+                  </SourceFooter>
+                )}
+              </DetailContent>
+            </>
+          ) : (
+            <DetailPlaceholder>
+              <PlaceholderIcon src={METEOR_ICON_URL} alt="" />
+              <PlaceholderText>选择微光，细细品味</PlaceholderText>
+            </DetailPlaceholder>
+          )}
+        </DetailColumn>
+      </Layout>
+    </Overlay>
   )
 }
 
@@ -207,29 +213,43 @@ const Overlay = styled.div`
   }
 `
 
-const ReadingColumn = styled.div`
-  width: 100%;
-  max-width: 720px;
+const Layout = styled.div`
+  display: flex;
+  width: 100vw;
   height: 100vh;
   background: ${theme.colors.bg.base};
-  border-left: 1px solid ${theme.colors.border.light};
+  overflow: hidden;
+  animation: fadeIn 0.25s ease-out;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+`
+
+const ListColumn = styled.div`
+  width: 360px;
+  flex-shrink: 0;
+  height: 100vh;
+  background: ${theme.colors.bg.base};
   border-right: 1px solid ${theme.colors.border.light};
   box-shadow: ${theme.shadows.card};
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+`
 
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(16px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
+const DetailColumn = styled.div`
+  flex: 1;
+  height: 100vh;
+  background: ${theme.colors.bg.input};
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 `
 
 const Header = styled.header`
@@ -416,53 +436,43 @@ const GleamList = styled.div`
   gap: 14px;
 `
 
-const DetailOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(60, 55, 45, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2147483647;
-  animation: fadeIn 0.25s ease-out;
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-`
-
-const DetailCard = styled.div`
-  width: 90%;
-  max-width: 720px;
-  max-height: 86vh;
-  background: ${theme.colors.bg.base};
-  border: 1px solid ${theme.colors.border.light};
-  border-radius: 16px;
-  box-shadow: ${theme.shadows.card};
+const DetailPlaceholder = styled.div`
+  flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 16px;
+  padding: 24px;
+  color: ${theme.colors.text.muted};
+`
 
-  @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(20px) scale(0.98);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
+const PlaceholderIcon = styled.img`
+  width: 44px;
+  height: 44px;
+  opacity: 0.25;
+`
+
+const PlaceholderText = styled.p`
+  margin: 0;
+  font-size: 14px;
+  color: ${theme.colors.text.muted};
+  line-height: 1.6;
+`
+
+const DetailCloseButton = styled.button`
+  background: none;
+  border: none;
+  color: ${theme.colors.text.muted};
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: ${theme.animations.transition};
+
+  &:hover {
+    color: ${theme.colors.text.primary};
   }
 `
 
@@ -520,6 +530,7 @@ const RevisitBadge = styled.span`
 `
 
 const DetailContent = styled.div`
+  flex: 1;
   padding: 24px;
   overflow-y: auto;
   overscroll-behavior: contain;

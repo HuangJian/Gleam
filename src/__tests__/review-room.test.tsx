@@ -124,19 +124,15 @@ describe('ReviewRoom', () => {
     expect(onCloseDetail).toHaveBeenCalledTimes(1)
   })
 
-  test('calls onCloseDetail when clicking the detail overlay backdrop', () => {
+  test('calls onCloseDetail when the detail close button is clicked', () => {
     const gleam = makeGleam({ thought: 'Backdrop test.' })
     const onCloseDetail = vi.fn()
-    const { getByTestId } = render(
+    const { getByTitle } = render(
       <ReviewRoom {...minimalProps({ viewingGleam: gleam, onCloseDetail })} />,
     )
-    // The detail overlay is the first child of the fragment after the main
-    // review room. We can find it by clicking on the overlay element that
-    // wraps the detail card. The DetailOverlay has onClick={onCloseDetail}.
-    // We click the overlay itself, not the card inside it.
-    const detailOverlay = getByTestId('review-room').nextSibling as HTMLElement
-    expect(detailOverlay).toBeTruthy()
-    fireEvent.click(detailOverlay)
+    // The detail now renders inline in the right column; the close button
+    // (titled "关闭详情") calls onCloseDetail.
+    fireEvent.click(getByTitle('关闭详情'))
     expect(onCloseDetail).toHaveBeenCalledTimes(1)
   })
 })

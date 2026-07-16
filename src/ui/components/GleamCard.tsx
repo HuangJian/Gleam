@@ -8,9 +8,10 @@ interface GleamCardProps {
   gleam: Gleam
   onRevisit: (id: string) => void
   onClick?: (gleam: Gleam) => void
+  selected?: boolean
 }
 
-export function GleamCard({ gleam, onRevisit, onClick }: GleamCardProps) {
+export function GleamCard({ gleam, onRevisit, onClick, selected = false }: GleamCardProps) {
   const getFormattedTime = (isoString: string) => {
     const d = new Date(isoString)
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -31,7 +32,7 @@ export function GleamCard({ gleam, onRevisit, onClick }: GleamCardProps) {
   }
 
   return (
-    <Card onClick={handleCardClick}>
+    <Card $selected={selected} onClick={handleCardClick}>
       <CardHeader>
         <TimeLabel>{getFormattedTime(gleam.created_at)}</TimeLabel>
         <HeaderActions>
@@ -72,9 +73,9 @@ export function GleamCard({ gleam, onRevisit, onClick }: GleamCardProps) {
   )
 }
 
-const Card = styled.div`
-  background: ${theme.colors.bg.card};
-  border: 1px solid ${theme.colors.border.card};
+const Card = styled.div<{ $selected: boolean }>`
+  background: ${(p) => (p.$selected ? 'rgba(255, 253, 248, 1)' : theme.colors.bg.card)};
+  border: 1px solid ${(p) => (p.$selected ? theme.colors.border.focus : theme.colors.border.card)};
   border-radius: 12px;
   padding: 16px;
   display: flex;
@@ -100,7 +101,7 @@ const Card = styled.div`
     width: 3px;
     height: 100%;
     background: ${theme.colors.brand.primary};
-    opacity: 0.8;
+    opacity: ${(p) => (p.$selected ? 1 : 0.8)};
   }
 `
 
