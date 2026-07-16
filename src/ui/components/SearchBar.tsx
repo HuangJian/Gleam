@@ -4,9 +4,29 @@ import { theme } from '../theme'
 interface SearchBarProps {
   value: string
   onChange: (value: string) => void
+  /** Whether the current query matched at least one gleam. When false and the
+   *  query is non-empty, we show clickable example queries. */
+  hasResults?: boolean
 }
 
-export function SearchBar({ value, onChange }: SearchBarProps) {
+/** Curated example queries shown when a search yields nothing. Keep in sync
+ *  with doc/query-language.md and the grammar in src/services/query.ts. */
+const EXAMPLE_QUERIES: { query: string; label: string }[] = [
+  { query: 'react', label: '查找任何包含「react」的微光' },
+  { query: '#family', label: '标签为 family 的微光' },
+  { query: 'domain:github.com', label: '来源来自 github.com 的微光' },
+  { query: 'type:book', label: '来源类型为「书」的微光' },
+  { query: '>=20260101 && <=20260630', label: '2026 年上半年的微光' },
+  { query: '#react OR #frontend', label: '标签为 react 或 frontend 的微光' },
+  { query: '-type:book', label: '排除来源为「书」的微光' },
+  { query: '>=this-month', label: '本月以来的微光' },
+  { query: 'in:2026', label: '2026 年全年的微光' },
+  { query: '~2026Q3', label: '2026 年第三季度的微光' },
+]
+
+export function SearchBar({ value, onChange, hasResults = true }: SearchBarProps) {
+  const showExamples = value.trim() !== '' && !hasResults
+
   return (
     <SearchContainer>
       <SearchIcon viewBox="0 0 24 24">
@@ -14,7 +34,7 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
       </SearchIcon>
       <StyledInput
         type="text"
-        placeholder="搜索我的理解、记录与来源..."
+        placeholder="搜索：关键字 / tag:react / domain:github.com / type:book / after:2026-01-01 ..."
         value={value}
         onInput={(e: any) => onChange((e.target as HTMLInputElement).value)}
         onKeyDown={(e: KeyboardEvent) => e.stopPropagation()}
@@ -25,11 +45,34 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
           &times;
         </ClearButton>
       )}
+
+      {showExamples && (
+        <ExamplesPanel>
+          <ExamplesHint>没有匹配的微光，试试这些查询：</ExamplesHint>
+          <ExamplesList>
+            {EXAMPLE_QUERIES.map((ex) => (
+              <ExampleItem
+                key={ex.query}
+                type="button"
+                onClick={() => onChange(ex.query)}
+                title={`填入查询：${ex.query}`}
+              >
+                <ExampleQuery>{ex.query}</ExampleQuery>
+                <ExampleLabel>
+                  {'    '}
+                  {ex.label}
+                </ExampleLabel>
+              </ExampleItem>
+            ))}
+          </ExamplesList>
+        </ExamplesPanel>
+      )}
     </SearchContainer>
   )
 }
 
 const SearchContainer = styled.div`
+  position: relative;
   display: flex;
   align-items: center;
   background: ${theme.colors.bg.input};
@@ -82,4 +125,67 @@ const ClearButton = styled.button`
   &:hover {
     color: ${theme.colors.text.primary};
   }
+`
+
+const ExamplesPanel = styled.div`
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: ${theme.colors.bg.card};
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 10px;
+  box-shadow: ${theme.shadows.popover};
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`
+
+const ExamplesHint = styled.div`
+  font-size: 12px;
+  color: ${theme.colors.text.muted};
+`
+
+const ExamplesList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`
+
+const ExampleItem = styled.button`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: ${theme.animations.transition};
+
+  &:hover {
+    background: ${theme.colors.reference.bg};
+  }
+`
+
+const ExampleQuery = styled.code`
+  flex-shrink: 0;
+  font-family: ${theme.typography.fontFamily};
+  font-size: 12px;
+  color: ${theme.colors.brand.primary};
+  background: ${theme.colors.reference.bg};
+  border: 1px solid ${theme.colors.reference.border};
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+`
+
+const ExampleLabel = styled.span`
+  font-size: 12px;
+  color: ${theme.colors.text.secondary};
+  padding-left: 4px;
+  white-space: pre;
 `

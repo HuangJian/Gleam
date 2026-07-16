@@ -19,7 +19,6 @@ function mockRepo(gleams: Gleam[]) {
     getById: async (id: string) => gleams.find((g) => g.id === id) ?? null,
     save: async () => {},
     delete: async () => {},
-    search: async () => gleams,
     updateDerivedFields: async () => {},
     renameTag: async () => {},
   }

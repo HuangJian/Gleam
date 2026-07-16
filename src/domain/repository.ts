@@ -23,11 +23,6 @@ export interface IRepository {
   delete(id: string): Promise<void>
 
   /**
-   * Performs a simple text search over thoughts, tags, source title, and excerpt.
-   */
-  search(query: string): Promise<Gleam[]>
-
-  /**
    * Updates only the mutable derived fields of a Gleam.
    * Modifying thought, source, or created_at is strictly prohibited at this layer.
    */

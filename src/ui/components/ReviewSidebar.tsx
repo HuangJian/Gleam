@@ -69,7 +69,11 @@ export function ReviewSidebar({
       </SidebarHeader>
 
       <SearchWrapper>
-        <SearchBar value={searchQuery} onChange={setSearchQuery} />
+        <SearchBar
+          value={searchQuery}
+          onChange={setSearchQuery}
+          hasResults={timelineGroups.length > 0}
+        />
       </SearchWrapper>
 
       <ScrollableContent>

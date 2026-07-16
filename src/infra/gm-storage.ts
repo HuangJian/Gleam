@@ -103,22 +103,6 @@ export class GMStorageAdapter implements IRepository {
     }
   }
 
-  public async search(query: string): Promise<Gleam[]> {
-    const records = await this.getAll()
-    if (!query.trim()) {
-      return records
-    }
-    const cleanQuery = query.toLowerCase().trim()
-    return records.filter((gleam) => {
-      const matchThought = gleam.thought.toLowerCase().includes(cleanQuery)
-      const matchTags = gleam.tags?.some((t) => t.toLowerCase().includes(cleanQuery)) || false
-      const matchTitle = gleam.source.title?.toLowerCase().includes(cleanQuery) || false
-      const matchExcerpt = gleam.source.excerpt?.toLowerCase().includes(cleanQuery) || false
-
-      return matchThought || matchTags || matchTitle || matchExcerpt
-    })
-  }
-
   public async updateDerivedFields(
     id: string,
     updates: Partial<Pick<Gleam, 'tags' | 'revisit_count' | 'last_revisited_at'>>,

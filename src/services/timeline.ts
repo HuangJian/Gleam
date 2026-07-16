@@ -1,5 +1,6 @@
 import { Gleam } from '../domain/gleam'
 import { IRepository } from '../domain/repository'
+import { QueryService } from './query'
 
 export interface TimelineGroup {
   dateLabel: string // e.g., "2026-07-12"
@@ -8,9 +9,11 @@ export interface TimelineGroup {
 
 export class TimelineService {
   private repository: IRepository
+  private queryService: QueryService
 
   constructor(repository: IRepository) {
     this.repository = repository
+    this.queryService = new QueryService(repository)
   }
 
   /**
@@ -19,7 +22,7 @@ export class TimelineService {
   public async getTimeline(query?: string): Promise<TimelineGroup[]> {
     const gleams =
       query && query.trim() !== ''
-        ? await this.repository.search(query)
+        ? await this.queryService.query(query)
         : await this.repository.getAll()
 
     // Group gleams by local date string

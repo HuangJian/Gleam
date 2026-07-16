@@ -56,9 +56,14 @@ describe('ReviewRoom', () => {
   test('calls onSearch when the search input changes', async () => {
     const onSearch = vi.fn()
     const { getByPlaceholderText } = render(<ReviewRoom {...minimalProps({ onSearch })} />)
-    fireEvent.input(getByPlaceholderText('搜索我的理解、记录与来源...'), {
-      target: { value: 'react' },
-    })
+    fireEvent.input(
+      getByPlaceholderText(
+        '搜索：关键字 / tag:react / domain:github.com / type:book / after:2026-01-01 ...',
+      ),
+      {
+        target: { value: 'react' },
+      },
+    )
     // The internal useEffect calls onSearch after each state change.
     await waitFor(() => expect(onSearch).toHaveBeenCalledWith('react'))
   })
