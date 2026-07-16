@@ -18,6 +18,8 @@ const REQUIRE = [
   `${CDN}/@emotion/styled@11.14.1/dist/emotion-styled.umd.min.js`,
   `${CDN}/marked@18.0.6/lib/marked.umd.js`,
   `${CDN}/dompurify@3.4.12/dist/purify.min.js`,
+  // HTML → Markdown for capturing a selection's structure (lists, quotes, …).
+  `${CDN}/turndown@7.2.4/dist/turndown.js`,
 ]
 
 // Bare module id -> global variable name exposed by the UMD builds above.
@@ -32,6 +34,7 @@ const GLOBALS: Record<string, string> = {
   '@emotion/styled': 'emotionStyled',
   marked: 'marked',
   dompurify: 'DOMPurify',
+  turndown: 'TurndownService',
 }
 
 export default defineConfig({

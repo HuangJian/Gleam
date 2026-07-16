@@ -6,12 +6,24 @@ import { MarkdownPreview } from './MarkdownPreview'
 import { MediaPreview } from './MediaPreview'
 import { SourceExcerpt } from './SourceExcerpt'
 import { SourceMedia } from '../../domain/gleam'
+import {
+  deriveSourceMarkdown,
+  DEFAULT_SOURCE_OPTIONS,
+  type SourceCaptureOptions,
+} from '../../utils/selection'
 
 interface CapturePanelProps {
-  excerpt?: string
+  /** Plain-text selection (used for plain-text mode + empty checks). */
+  excerptText?: string
+  /** HTML of the selected range only. */
+  excerptHtml?: string
+  /** innerHTML of the enclosing block, or null when selection spans blocks. */
+  excerptFullHtml?: string | null
+  /** tagName of the enclosing block, or null. */
+  excerptFullTag?: string | null
   media?: SourceMedia
   initialThought?: string
-  onSave?: (thought: string) => Promise<void>
+  onSave?: (thought: string, sourceExcerpt?: string) => Promise<void>
   onClose: () => void
 }
 
@@ -40,8 +52,38 @@ function buildIndentOverlayHtml(text: string): string {
     .join('\n')
 }
 
+// Small labeled checkbox used for the source capture options.
+function OptionCheckControl({
+  label,
+  checked,
+  onChange,
+  disabled = false,
+  title,
+}: {
+  label: string
+  checked: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+  title?: string
+}) {
+  return (
+    <OptionCheckLabel title={title}>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e: Event) => onChange((e.target as HTMLInputElement).checked)}
+      />
+      {label}
+    </OptionCheckLabel>
+  )
+}
+
 export function CapturePanel({
-  excerpt,
+  excerptText = '',
+  excerptHtml = '',
+  excerptFullHtml = null,
+  excerptFullTag = null,
   media,
   initialThought = '',
   onSave,
@@ -52,7 +94,21 @@ export function CapturePanel({
   const [error, setError] = useState('')
   const [mode, setMode] = useState<'write' | 'preview'>('write')
   const [showIndent, setShowIndent] = useState(false)
+  // Whether the source is stored as Markdown (default) or plain text. When off,
+  // the structure-preserving options are disabled.
+  const [useMarkdown, setUseMarkdown] = useState(true)
+  // Exclusion options for the full-block capture. All default on; the user can
+  // toggle them to widen/narrow what gets pulled in.
+  const [options, setOptions] = useState<SourceCaptureOptions>(DEFAULT_SOURCE_OPTIONS)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // The source content actually saved, per the chosen format and options.
+  const resolvedExcerpt = useMarkdown
+    ? deriveSourceMarkdown(
+        { text: excerptText, excerptHtml, excerptFullHtml, excerptFullTag },
+        options,
+      )
+    : excerptText
 
   useEffect(() => {
     if (mode === 'write') {
@@ -75,7 +131,7 @@ export function CapturePanel({
     setError('')
     setIsSaving(true)
     try {
-      await onSave?.(thought)
+      await onSave?.(thought, resolvedExcerpt || undefined)
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败')
@@ -164,7 +220,59 @@ export function CapturePanel({
             </>
           </InputSection>
 
-          {excerpt && <SourceExcerpt text={excerpt} />}
+          {resolvedExcerpt && (
+            <SourceLayout>
+              <SourcePreview>
+                <SourceExcerpt text={resolvedExcerpt} />
+              </SourcePreview>
+              <SourceOptions>
+                <OptionCheckControl
+                  label="Markdown 格式"
+                  title="以 Markdown 保存来源，保留段落/列表/引用等结构。取消后保存为纯文本，下方选项不可用。"
+                  checked={useMarkdown}
+                  onChange={setUseMarkdown}
+                />
+                <OptionDivider />
+                <OptionGroup $disabled={!useMarkdown}>
+                  <OptionCheckControl
+                    label="完整段落"
+                    title="选区落在单一块（如段落）内时，捕获整个块，而非仅选中文字。可找回无法选中的链接文字。"
+                    checked={options.fullBlock}
+                    disabled={!useMarkdown}
+                    onChange={(v) => setOptions((o) => ({ ...o, fullBlock: v }))}
+                  />
+                  <OptionCheckControl
+                    label="仅内容块"
+                    title="拒绝 ARTICLE/SECTION/FIGURE 等容器块作为「完整段落」，避免整篇被拾入。"
+                    checked={options.contentBlocksOnly}
+                    disabled={!useMarkdown}
+                    onChange={(v) => setOptions((o) => ({ ...o, contentBlocksOnly: v }))}
+                  />
+                  <OptionCheckControl
+                    label="剔除噪声"
+                    title="转换前移除按钮、输入框、SVG、图片、隐藏元素、脚注标记等无关节点。"
+                    checked={options.pruneNoise}
+                    disabled={!useMarkdown}
+                    onChange={(v) => setOptions((o) => ({ ...o, pruneNoise: v }))}
+                  />
+                  <OptionCheckControl
+                    label="过大回退"
+                    title="若完整块远大于选区（>5× 且 >400 字符），判定为误拾，回退到仅选区。"
+                    checked={options.fallBackIfLarge}
+                    disabled={!useMarkdown}
+                    onChange={(v) => setOptions((o) => ({ ...o, fallBackIfLarge: v }))}
+                  />
+                  <OptionCheckControl
+                    label="div 作段落"
+                    title="把叶子 <div> 也当作段落处理（许多站点用 div 包裹段落）。"
+                    checked={options.divAsParagraph}
+                    disabled={!useMarkdown}
+                    onChange={(v) => setOptions((o) => ({ ...o, divAsParagraph: v }))}
+                  />
+                </OptionGroup>
+              </SourceOptions>
+            </SourceLayout>
+          )}
 
           {media && <MediaPreview media={media} />}
 
@@ -286,6 +394,59 @@ const InputSection = styled.div`
   gap: 8px;
   flex: 1;
   min-height: 0;
+`
+
+// Two-column layout: source preview on the left, capture options on the right.
+const SourceLayout = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 16px;
+  align-items: start;
+`
+
+const SourcePreview = styled.div`
+  min-width: 0;
+`
+
+const SourceOptions = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: flex-start;
+`
+
+const OptionDivider = styled.div`
+  height: 1px;
+  background: ${theme.colors.border.light};
+  margin: 2px 0;
+`
+
+// Column of small checkboxes for the full-block exclusion options.
+const OptionGroup = styled.div<{ $disabled: boolean }>`
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  opacity: ${(p) => (p.$disabled ? 0.45 : 1)};
+  pointer-events: ${(p) => (p.$disabled ? 'none' : 'auto')};
+`
+
+const OptionCheckLabel = styled.label`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: ${theme.colors.text.secondary};
+  cursor: pointer;
+  user-select: none;
+
+  input {
+    accent-color: ${theme.colors.brand.primary};
+    cursor: pointer;
+  }
+
+  input:disabled {
+    cursor: not-allowed;
+  }
 `
 
 const EditorToolbar = styled.div`

@@ -25,8 +25,8 @@ describe('GleamCard', () => {
   test('does not render an excerpt block when absent', () => {
     const gleam = makeGleam({ thought: 'Plain thought.' })
     const { container } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
-    // The excerpt is rendered in a <blockquote> — none should exist.
-    expect(container.querySelector('blockquote')).toBeNull()
+    // The source reference (来源引用) is only shown when an excerpt exists.
+    expect(container.querySelector('figure')).toBeNull()
   })
 
   test('shows the source link when a URL is present', () => {

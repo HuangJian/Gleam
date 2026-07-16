@@ -18,7 +18,10 @@ interface AppProps {
 export function App({ repository, shadowHost }: AppProps) {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false)
   const [isReviewOpen, setIsReviewOpen] = useState(false)
-  const [activeExcerpt, setActiveExcerpt] = useState('')
+  const [activeExcerptText, setActiveExcerptText] = useState('')
+  const [activeExcerptHtml, setActiveExcerptHtml] = useState('')
+  const [activeExcerptFullHtml, setActiveExcerptFullHtml] = useState<string | null>(null)
+  const [activeExcerptFullTag, setActiveExcerptFullTag] = useState<string | null>(null)
   const [activeMedia, setActiveMedia] = useState<SourceMedia | undefined>(undefined)
   const [timelineGroups, setTimelineGroups] = useState<TimelineGroup[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -58,7 +61,7 @@ export function App({ repository, shadowHost }: AppProps) {
       if (isModifier && isShift && isG) {
         e.preventDefault()
         setViewingGleam(null)
-        setActiveExcerpt('')
+        setActiveExcerptText('')
         setIsCaptureOpen(true)
       }
     }
@@ -67,28 +70,44 @@ export function App({ repository, shadowHost }: AppProps) {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
   }, [])
 
-  const handleTriggerCapture = (payload: { excerpt?: string; media?: SourceMedia }) => {
+  const handleTriggerCapture = (payload: {
+    text: string
+    excerptHtml: string
+    excerptFullHtml: string | null
+    excerptFullTag: string | null
+    media?: SourceMedia
+  }) => {
     setViewingGleam(null)
-    setActiveExcerpt(payload.excerpt || '')
+    setActiveExcerptText(payload.text)
+    setActiveExcerptHtml(payload.excerptHtml)
+    setActiveExcerptFullHtml(payload.excerptFullHtml)
+    setActiveExcerptFullTag(payload.excerptFullTag)
     setActiveMedia(payload.media)
     setIsCaptureOpen(true)
   }
 
-  const handleSaveCapture = async (thought: string) => {
+  const handleSaveCapture = async (thought: string, sourceExcerpt?: string) => {
+    const excerpt = sourceExcerpt ?? activeExcerptText
     await captureService.capture(
       thought,
-      activeExcerpt || undefined,
+      excerpt || undefined,
       activeMedia ? { media: activeMedia, url: activeMedia.src, title: document.title } : undefined,
     )
     await refreshTimeline()
     setIsCaptureOpen(false)
-    setActiveExcerpt('')
+    setActiveExcerptText('')
+    setActiveExcerptHtml('')
+    setActiveExcerptFullHtml(null)
+    setActiveExcerptFullTag(null)
     setActiveMedia(undefined)
   }
 
   const handleAddGleam = () => {
     setViewingGleam(null)
-    setActiveExcerpt('')
+    setActiveExcerptText('')
+    setActiveExcerptHtml('')
+    setActiveExcerptFullHtml(null)
+    setActiveExcerptFullTag(null)
     setActiveMedia(undefined)
     setIsCaptureOpen(true)
   }
@@ -143,7 +162,10 @@ export function App({ repository, shadowHost }: AppProps) {
 
   const handleCloseCapture = () => {
     setIsCaptureOpen(false)
-    setActiveExcerpt('')
+    setActiveExcerptText('')
+    setActiveExcerptHtml('')
+    setActiveExcerptFullHtml(null)
+    setActiveExcerptFullTag(null)
     setViewingGleam(null)
   }
 
@@ -159,7 +181,10 @@ export function App({ repository, shadowHost }: AppProps) {
       {isCaptureOpen && (
         <CapturePanel
           media={activeMedia}
-          excerpt={activeExcerpt || undefined}
+          excerptText={activeExcerptText}
+          excerptHtml={activeExcerptHtml}
+          excerptFullHtml={activeExcerptFullHtml}
+          excerptFullTag={activeExcerptFullTag}
           onSave={handleSaveCapture}
           onClose={handleCloseCapture}
         />

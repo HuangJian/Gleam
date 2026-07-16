@@ -1,8 +1,9 @@
 import styled from '@emotion/styled'
 import { theme } from '../theme'
+import { MarkdownPreview } from './MarkdownPreview'
 
 interface SourceExcerptProps {
-  /** The captured source text (e.g. a selected passage). */
+  /** The captured source text (e.g. a selected passage), as Markdown. */
   text: string
   /** Compact mode for card/list display (smaller fonts, tighter, clamped). */
   compact?: boolean
@@ -13,13 +14,16 @@ interface SourceExcerptProps {
  * captured from). It uses a deliberately neutral visual language — a gray left
  * border and a "来源引用" caption — so it is never confused with a blockquote
  * the user wrote inside their own thought (which uses the gold brand style via
- * MarkdownPreview).
+ * MarkdownPreview). The source is stored as Markdown and rendered as such,
+ * preserving the page's block structure (lists, quotes, …).
  */
 export function SourceExcerpt({ text, compact = false }: SourceExcerptProps) {
   return (
     <Wrapper $compact={compact}>
       <Caption $compact={compact}>来源引用</Caption>
-      <Quote $compact={compact}>“{text}”</Quote>
+      <Quote $compact={compact}>
+        <MarkdownPreview content={text} compact={compact} />
+      </Quote>
     </Wrapper>
   )
 }
@@ -55,14 +59,11 @@ const Quote = styled.blockquote<{ $compact: boolean }>`
   font-size: ${(p) => (p.$compact ? '12px' : '13.5px')};
   color: ${theme.colors.reference.text};
   line-height: 1.5;
-  font-style: italic;
   ${(p) =>
     p.$compact &&
     `
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    max-height: 96px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   `}
 `

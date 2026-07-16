@@ -3,9 +3,16 @@ import styled from '@emotion/styled'
 import { theme } from '../theme'
 import { METEOR_ICON_URL } from '../assets'
 import { SourceMedia } from '../../domain/gleam'
+import { extractSelectionMarkdown, type SelectionMarkdown } from '../../utils/selection'
 
 interface CaptureTriggerProps {
-  onTrigger: (payload: { excerpt?: string; media?: SourceMedia }) => void
+  onTrigger: (payload: {
+    text: string
+    excerptHtml: string
+    excerptFullHtml: string | null
+    excerptFullTag: string | null
+    media?: SourceMedia
+  }) => void
   shadowHost: HTMLElement
 }
 
@@ -67,6 +74,10 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isHoveringRef = useRef(false)
+  // Raw selection payload derived at mouseup, captured so the button's
+  // mousedown (which may fire after the selection is cleared) can still pass
+  // it through. The CapturePanel derives the final Markdown from this.
+  const pendingPayloadRef = useRef<SelectionMarkdown | null>(null)
 
   const clearTrigger = () => {
     setPosition(null)
@@ -89,11 +100,12 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
         const selection = window.getSelection()
         if (!selection) return
 
-        const text = selection.toString().trim()
-        if (!text) {
+        const extracted = extractSelectionMarkdown(selection)
+        if (!extracted) {
           clearTrigger()
           return
         }
+        const { text } = extracted
 
         // Check if selection is inside an input or textarea
         const activeEl = document.activeElement
@@ -117,6 +129,10 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
 
           setPosition(nextPosition)
           setSelectionText(text)
+          // Stash the raw selection payload on the closure so the button's
+          // mousedown handler can read it without re-deriving the selection
+          // (which may already be cleared by then).
+          pendingPayloadRef.current = extracted
         } catch {
           // Range might be invalid
           clearTrigger()
@@ -239,10 +255,18 @@ export function CaptureTrigger({ onTrigger, shadowHost }: CaptureTriggerProps) {
       onMouseDown={(e: MouseEvent) => {
         e.stopPropagation()
         e.preventDefault()
-        onTrigger({ excerpt: selectionText || undefined, media: mediaPayload })
+        const payload = pendingPayloadRef.current
+        onTrigger({
+          text: payload?.text || selectionText || '',
+          excerptHtml: payload?.excerptHtml ?? '',
+          excerptFullHtml: payload?.excerptFullHtml ?? null,
+          excerptFullTag: payload?.excerptFullTag ?? null,
+          media: mediaPayload,
+        })
         setPosition(null)
         setSelectionText('')
         setMediaPayload(undefined)
+        pendingPayloadRef.current = null
         // Clear window selection
         window.getSelection()?.removeAllRanges()
       }}

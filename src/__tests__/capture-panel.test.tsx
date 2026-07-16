@@ -31,7 +31,7 @@ describe('CapturePanel', () => {
     expect(saveBtn.disabled).toBe(false)
     fireEvent.click(saveBtn)
 
-    await waitFor(() => expect(onSave).toHaveBeenCalledWith('My new insight.'))
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith('My new insight.', undefined))
     // onSave resolves → onClose is called
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
@@ -44,7 +44,9 @@ describe('CapturePanel', () => {
   })
 
   test('shows the excerpt section when an excerpt is provided', () => {
-    const { getByText } = render(<CapturePanel excerpt="A notable passage." onClose={() => {}} />)
+    const { getByText } = render(
+      <CapturePanel excerptText="A notable passage." onClose={() => {}} />,
+    )
     expect(getByText('来源引用')).toBeTruthy()
     expect(getByText(/A notable passage/)).toBeTruthy()
   })
@@ -75,7 +77,7 @@ describe('CapturePanel', () => {
     fireEvent.input(textarea, { target: { value: 'Quick capture.' } })
     fireEvent.keyDown(textarea, { key: 'Enter', metaKey: true })
 
-    await waitFor(() => expect(onSave).toHaveBeenCalledWith('Quick capture.'))
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith('Quick capture.', undefined))
   })
 
   test('shows error message when onSave rejects', async () => {
