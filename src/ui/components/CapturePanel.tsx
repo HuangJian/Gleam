@@ -4,6 +4,7 @@ import { theme } from '../theme'
 import { METEOR_ICON_URL } from '../assets'
 import { MarkdownPreview } from './MarkdownPreview'
 import { MediaPreview } from './MediaPreview'
+import { SourceExcerpt } from './SourceExcerpt'
 import { SourceMedia } from '../../domain/gleam'
 
 interface CapturePanelProps {
@@ -163,12 +164,7 @@ export function CapturePanel({
             </>
           </InputSection>
 
-          {excerpt && (
-            <ExcerptSection>
-              <SectionLabel>触发语境 (Excerpt)</SectionLabel>
-              <ExcerptText>“ {excerpt} ”</ExcerptText>
-            </ExcerptSection>
-          )}
+          {excerpt && <SourceExcerpt text={excerpt} />}
 
           {media && <MediaPreview media={media} />}
 
@@ -282,35 +278,6 @@ const Content = styled.div`
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-`
-
-const ExcerptSection = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex-shrink: 0;
-`
-
-const SectionLabel = styled.span`
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: ${theme.colors.text.muted};
-  font-weight: 600;
-`
-
-const ExcerptText = styled.blockquote`
-  margin: 0;
-  padding: 12px 16px;
-  background: rgba(200, 180, 140, 0.08);
-  border-left: 3px solid ${theme.colors.brand.primary};
-  border-radius: 0 8px 8px 0;
-  font-size: 13.5px;
-  color: ${theme.colors.text.secondary};
-  line-height: 1.5;
-  font-style: italic;
-  max-height: 100px;
-  overflow-y: auto;
 `
 
 const InputSection = styled.div`

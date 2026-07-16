@@ -3,6 +3,7 @@ import { Gleam } from '../../domain/gleam'
 import { theme } from '../theme'
 import { MarkdownPreview } from './MarkdownPreview'
 import { MediaPreview } from './MediaPreview'
+import { SourceExcerpt } from './SourceExcerpt'
 import { TagCount } from '../../services/tag'
 
 interface GleamCardProps {
@@ -72,7 +73,7 @@ export function GleamCard({
         <MarkdownPreview content={gleam.thought} compact />
       </ThoughtText>
 
-      {gleam.source.excerpt && <SourceExcerpt>" {gleam.source.excerpt} "</SourceExcerpt>}
+      {gleam.source.excerpt && <SourceExcerpt text={gleam.source.excerpt} compact />}
 
       {gleam.source.media && <MediaPreview media={gleam.source.media} compact />}
 
@@ -196,22 +197,6 @@ const ThoughtText = styled.div`
   max-height: 4.8em;
   overflow-y: auto;
   overscroll-behavior: contain;
-`
-
-const SourceExcerpt = styled.blockquote`
-  margin: 0;
-  padding: 8px 12px;
-  background: rgba(200, 180, 140, 0.06);
-  border-left: 2px solid rgba(200, 180, 140, 0.3);
-  font-size: 12px;
-  color: ${theme.colors.text.secondary};
-  line-height: 1.5;
-  font-style: italic;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
 `
 
 const SourceFooter = styled.div`

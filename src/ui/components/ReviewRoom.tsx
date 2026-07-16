@@ -6,6 +6,7 @@ import { GleamCard } from './GleamCard'
 import { SearchBar } from './SearchBar'
 import { MarkdownPreview } from './MarkdownPreview'
 import { MediaPreview } from './MediaPreview'
+import { SourceExcerpt } from './SourceExcerpt'
 import { TagEditor } from './TagEditor'
 import { TagCount } from '../../services/tag'
 import { theme } from '../theme'
@@ -178,7 +179,7 @@ export function ReviewRoom({
                 </ThoughtText>
 
                 {viewingGleam.source.excerpt && (
-                  <SourceExcerpt>" {viewingGleam.source.excerpt} "</SourceExcerpt>
+                  <SourceExcerpt text={viewingGleam.source.excerpt} />
                 )}
 
                 {viewingGleam.source.media && <MediaPreview media={viewingGleam.source.media} />}
@@ -615,18 +616,6 @@ const ThoughtText = styled.div`
   font-size: 15px;
   line-height: 1.7;
   color: ${theme.colors.text.primary};
-`
-
-const SourceExcerpt = styled.blockquote`
-  margin: 0;
-  padding: 12px 16px;
-  background: rgba(200, 180, 140, 0.08);
-  border-left: 3px solid ${theme.colors.brand.primary};
-  border-radius: 0 8px 8px 0;
-  font-size: 13.5px;
-  color: ${theme.colors.text.secondary};
-  line-height: 1.5;
-  font-style: italic;
 `
 
 const SourceFooter = styled.div`

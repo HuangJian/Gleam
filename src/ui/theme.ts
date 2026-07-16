@@ -23,6 +23,15 @@ export const theme = {
       primaryHover: 'hsl(38, 90%, 42%)', // Deeper gold
       glow: 'rgba(218, 165, 80, 0.25)', // Warm amber glow
     },
+    // Source reference styling — deliberately neutral (NOT the gold brand used
+    // for a user's own blockquote in their thought) so the two are never
+    // confused. See SourceExcerpt component.
+    reference: {
+      border: 'hsl(35, 8%, 68%)', // Neutral warm gray, distinct from gold
+      bg: 'rgba(120, 110, 95, 0.05)', // Subtle neutral wash
+      caption: 'hsl(35, 10%, 50%)', // Muted label
+      text: 'hsl(35, 12%, 40%)', // Readable secondary
+    },
   },
   typography: {
     fontFamily:

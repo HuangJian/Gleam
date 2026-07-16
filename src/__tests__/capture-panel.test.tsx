@@ -45,7 +45,7 @@ describe('CapturePanel', () => {
 
   test('shows the excerpt section when an excerpt is provided', () => {
     const { getByText } = render(<CapturePanel excerpt="A notable passage." onClose={() => {}} />)
-    expect(getByText('触发语境 (Excerpt)')).toBeTruthy()
+    expect(getByText('来源引用')).toBeTruthy()
     expect(getByText(/A notable passage/)).toBeTruthy()
   })
 
