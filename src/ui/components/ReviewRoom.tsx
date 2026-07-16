@@ -6,6 +6,8 @@ import { GleamCard } from './GleamCard'
 import { SearchBar } from './SearchBar'
 import { MarkdownPreview } from './MarkdownPreview'
 import { MediaPreview } from './MediaPreview'
+import { TagEditor } from './TagEditor'
+import { TagCount } from '../../services/tag'
 import { theme } from '../theme'
 import { METEOR_ICON_URL } from '../assets'
 import { formatReviewTime, getSourceHost } from '../../utils/review'
@@ -21,6 +23,9 @@ interface ReviewRoomProps {
   viewingGleam: Gleam | null
   onOpenGleam: (gleam: Gleam) => void
   onCloseDetail: () => void
+  tagCounts: TagCount[]
+  onAddTag: (gleamId: string, tag: string) => Promise<void>
+  onRemoveTag: (gleamId: string, tag: string) => Promise<void>
 }
 
 export function ReviewRoom({
@@ -34,6 +39,9 @@ export function ReviewRoom({
   viewingGleam,
   onOpenGleam,
   onCloseDetail,
+  tagCounts,
+  onAddTag,
+  onRemoveTag,
 }: ReviewRoomProps) {
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -50,6 +58,13 @@ export function ReviewRoom({
   }, [isOpen])
 
   if (!isOpen) return null
+
+  const countMap = new Map(tagCounts.map((tc) => [tc.tag, tc.count]))
+  const sortedTags = viewingGleam
+    ? (viewingGleam.tags ?? [])
+        .slice()
+        .sort((a, b) => (countMap.get(b) ?? 0) - (countMap.get(a) ?? 0))
+    : []
 
   const handleCardClick = (gleam: Gleam) => {
     onOpenGleam(gleam)
@@ -110,6 +125,7 @@ export function ReviewRoom({
                           key={gleam.id}
                           gleam={gleam}
                           selected={viewingGleam?.id === gleam.id}
+                          tagCounts={tagCounts}
                           onRevisit={onRevisitGleam}
                           onClick={handleCardClick}
                         />
@@ -131,17 +147,29 @@ export function ReviewRoom({
                     <path d="M20,11V13H8L13.5,18.5L12,20L4,12L12,4L13.5,5.5L8,11H20Z" />
                   </svg>
                 </BackButton>
-                <DetailMeta>
-                  <DetailTime>{formatReviewTime(viewingGleam.created_at)}</DetailTime>
+                <HeaderTags>
+                  {sortedTags.map((tag) => (
+                    <HeaderTagChip
+                      key={tag}
+                      onClick={() => onRemoveTag(viewingGleam.id, tag)}
+                      title={`${tag} · 用于 ${countMap.get(tag) ?? 0} 条拾光 · 点击移除`}
+                    >
+                      {tag}
+                      <HeaderTagRemove aria-hidden>&times;</HeaderTagRemove>
+                    </HeaderTagChip>
+                  ))}
+                </HeaderTags>
+                <DetailTime>{formatReviewTime(viewingGleam.created_at)}</DetailTime>
+                <DetailActions>
                   {viewingGleam.revisit_count && viewingGleam.revisit_count > 0 ? (
                     <RevisitBadge title={`回顾次数: ${viewingGleam.revisit_count}`}>
                       👁 {viewingGleam.revisit_count}
                     </RevisitBadge>
                   ) : null}
-                </DetailMeta>
-                <DetailCloseButton onClick={onCloseDetail} title="关闭详情">
-                  &times;
-                </DetailCloseButton>
+                  <DetailCloseButton onClick={onCloseDetail} title="关闭详情">
+                    &times;
+                  </DetailCloseButton>
+                </DetailActions>
               </DetailHeader>
 
               <DetailContent>
@@ -173,6 +201,12 @@ export function ReviewRoom({
                     <SourceHost>{getSourceHost(viewingGleam.source.url)}</SourceHost>
                   </SourceFooter>
                 )}
+
+                <TagEditor
+                  tags={viewingGleam.tags ?? []}
+                  tagCounts={tagCounts}
+                  onAdd={(tag) => onAddTag(viewingGleam.id, tag)}
+                />
               </DetailContent>
             </>
           ) : (
@@ -507,18 +541,56 @@ const BackButton = styled.button`
   }
 `
 
-const DetailMeta = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  justify-content: center;
-`
-
 const DetailTime = styled.span`
   font-size: 12px;
   color: ${theme.colors.text.muted};
   font-weight: 500;
+  flex-shrink: 0;
+`
+
+const HeaderTags = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  flex-wrap: nowrap;
+  padding: 0 12px;
+`
+
+const HeaderTagChip = styled.span`
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(200, 180, 140, 0.15);
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 10px;
+  padding: 1px 6px 1px 8px;
+  font-size: 11px;
+  color: ${theme.colors.text.secondary};
+  white-space: nowrap;
+  cursor: pointer;
+  transition: ${theme.animations.transition};
+
+  &:hover {
+    color: ${theme.colors.text.accent};
+    border-color: ${theme.colors.border.focus};
+  }
+`
+
+const HeaderTagRemove = styled.span`
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.6;
+`
+
+const DetailActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 `
 
 const RevisitBadge = styled.span`

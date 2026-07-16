@@ -3,15 +3,23 @@ import { Gleam } from '../../domain/gleam'
 import { theme } from '../theme'
 import { MarkdownPreview } from './MarkdownPreview'
 import { MediaPreview } from './MediaPreview'
+import { TagCount } from '../../services/tag'
 
 interface GleamCardProps {
   gleam: Gleam
   onRevisit: (id: string) => void
   onClick?: (gleam: Gleam) => void
   selected?: boolean
+  tagCounts?: TagCount[]
 }
 
-export function GleamCard({ gleam, onRevisit, onClick, selected = false }: GleamCardProps) {
+export function GleamCard({
+  gleam,
+  onRevisit,
+  onClick,
+  selected = false,
+  tagCounts = [],
+}: GleamCardProps) {
   const getFormattedTime = (isoString: string) => {
     const d = new Date(isoString)
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -31,10 +39,26 @@ export function GleamCard({ gleam, onRevisit, onClick, selected = false }: Gleam
     onClick?.(gleam)
   }
 
+  const countMap = new Map(tagCounts.map((tc) => [tc.tag, tc.count]))
+  const sortedTags = (gleam.tags ?? [])
+    .slice()
+    .sort((a, b) => (countMap.get(b) ?? 0) - (countMap.get(a) ?? 0))
+
   return (
     <Card $selected={selected} onClick={handleCardClick}>
       <CardHeader>
-        <TimeLabel>{getFormattedTime(gleam.created_at)}</TimeLabel>
+        <HeaderLeft>
+          <TimeLabel>{getFormattedTime(gleam.created_at)}</TimeLabel>
+          {sortedTags.length > 0 && (
+            <TagChips>
+              {sortedTags.map((tag) => (
+                <TagChip key={tag} title={`${tag} · 用于 ${countMap.get(tag) ?? 0} 条拾光`}>
+                  {tag}
+                </TagChip>
+              ))}
+            </TagChips>
+          )}
+        </HeaderLeft>
         <HeaderActions>
           {gleam.revisit_count && gleam.revisit_count > 0 ? (
             <RevisitBadge title={`回顾次数: ${gleam.revisit_count}`}>
@@ -109,12 +133,25 @@ const CardHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  gap: 8px;
+`
+
+const HeaderLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  flex-wrap: nowrap;
 `
 
 const TimeLabel = styled.span`
   font-size: 11px;
   color: ${theme.colors.text.muted};
   font-weight: 500;
+  flex-shrink: 0;
 `
 
 const HeaderActions = styled.div`
@@ -129,6 +166,26 @@ const RevisitBadge = styled.span`
   padding: 2px 6px;
   border-radius: 4px;
   color: ${theme.colors.text.muted};
+`
+
+const TagChips = styled.div`
+  display: flex;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  gap: 6px;
+  max-height: 22px;
+  min-width: 0;
+`
+
+const TagChip = styled.span`
+  flex-shrink: 0;
+  background: rgba(200, 180, 140, 0.15);
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 11px;
+  color: ${theme.colors.text.secondary};
+  white-space: nowrap;
 `
 
 const ThoughtText = styled.div`

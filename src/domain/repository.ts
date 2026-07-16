@@ -35,4 +35,11 @@ export interface IRepository {
     id: string,
     updates: Partial<Pick<Gleam, 'tags' | 'revisit_count' | 'last_revisited_at'>>,
   ): Promise<void>
+
+  /**
+   * Renames a tag across every Gleam that uses it. If the target name already
+   * exists on a Gleam, the two are merged (deduplicated). Operates only on the
+   * derived `tags` field.
+   */
+  renameTag(oldTag: string, newTag: string): Promise<void>
 }

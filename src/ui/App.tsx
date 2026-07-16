@@ -3,6 +3,7 @@ import { Gleam } from '../domain/gleam'
 import { IRepository } from '../domain/repository'
 import { CaptureService } from '../services/capture'
 import { TimelineService, TimelineGroup } from '../services/timeline'
+import { TagService, TagCount } from '../services/tag'
 import { CaptureTrigger } from './components/CaptureTrigger'
 import { CapturePanel } from './components/CapturePanel'
 import { ReviewRoom } from './components/ReviewRoom'
@@ -22,15 +23,26 @@ export function App({ repository, shadowHost }: AppProps) {
   const [timelineGroups, setTimelineGroups] = useState<TimelineGroup[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [viewingGleam, setViewingGleam] = useState<Gleam | null>(null)
+  const [tagCounts, setTagCounts] = useState<TagCount[]>([])
 
   const captureService = new CaptureService(repository)
   const timelineService = new TimelineService(repository)
+  const tagService = new TagService(repository)
 
   // Load and refresh timeline
   const refreshTimeline = async (query = searchQuery) => {
     const groups = await timelineService.getTimeline(query)
     setTimelineGroups(groups)
   }
+
+  // Refresh the global tag vocabulary (counts) after any tag mutation.
+  const refreshTags = async () => {
+    setTagCounts(await tagService.getAllTagCounts())
+  }
+
+  useEffect(() => {
+    refreshTags()
+  }, [])
 
   useEffect(() => {
     refreshTimeline()
@@ -91,6 +103,26 @@ export function App({ repository, shadowHost }: AppProps) {
     await refreshTimeline()
   }
 
+  const handleAddTag = async (gleamId: string, tag: string) => {
+    const gleam = await repository.getById(gleamId)
+    if (!gleam) return
+    const next = Array.from(new Set([...(gleam.tags ?? []), tag]))
+    await repository.updateDerivedFields(gleamId, { tags: next })
+    setViewingGleam({ ...gleam, tags: next })
+    await refreshTimeline()
+    await refreshTags()
+  }
+
+  const handleRemoveTag = async (gleamId: string, tag: string) => {
+    const gleam = await repository.getById(gleamId)
+    if (!gleam) return
+    const next = (gleam.tags ?? []).filter((t) => t !== tag)
+    await repository.updateDerivedFields(gleamId, { tags: next })
+    setViewingGleam({ ...gleam, tags: next })
+    await refreshTimeline()
+    await refreshTags()
+  }
+
   const handleExportData = async () => {
     try {
       const allGleams = await repository.getAll()
@@ -145,6 +177,9 @@ export function App({ repository, shadowHost }: AppProps) {
         viewingGleam={viewingGleam}
         onOpenGleam={handleViewGleam}
         onCloseDetail={() => setViewingGleam(null)}
+        tagCounts={tagCounts}
+        onAddTag={handleAddTag}
+        onRemoveTag={handleRemoveTag}
       />
     </>
   )

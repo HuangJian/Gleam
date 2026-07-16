@@ -143,4 +143,26 @@ export class GMStorageAdapter implements IRepository {
     records[id] = gleam
     this.saveRecords(records)
   }
+
+  public async renameTag(oldTag: string, newTag: string): Promise<void> {
+    const normalizedOld = oldTag.trim()
+    const normalizedNew = newTag.trim()
+    if (!normalizedOld || !normalizedNew || normalizedOld === normalizedNew) {
+      return
+    }
+
+    const records = this.loadRecords()
+    let changed = false
+    for (const gleam of Object.values(records)) {
+      const tags = gleam.tags ?? []
+      if (!tags.includes(normalizedOld)) continue
+      const next = tags.filter((t) => t !== normalizedOld).concat(normalizedNew)
+      gleam.tags = Array.from(new Set(next))
+      records[gleam.id] = gleam
+      changed = true
+    }
+    if (changed) {
+      this.saveRecords(records)
+    }
+  }
 }
