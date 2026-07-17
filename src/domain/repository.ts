@@ -18,17 +18,12 @@ export interface IRepository {
   getAll(): Promise<Gleam[]>
 
   /**
-   * Deletes a Gleam by its ID.
-   */
-  delete(id: string): Promise<void>
-
-  /**
    * Updates only the mutable derived fields of a Gleam.
-   * Modifying thought, source, or created_at is strictly prohibited at this layer.
+   * Modifying thought, source, or createdAt is strictly prohibited at this layer.
    */
   updateDerivedFields(
     id: string,
-    updates: Partial<Pick<Gleam, 'tags' | 'revisit_count' | 'last_revisited_at'>>,
+    updates: Partial<Pick<Gleam, 'tags' | 'revisitCount' | 'lastRevisitedAt'>>,
   ): Promise<void>
 
   /**

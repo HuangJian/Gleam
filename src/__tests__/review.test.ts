@@ -19,8 +19,8 @@ describe('getSourceHost', () => {
     expect(getSourceHost('https://example.com/path?q=1')).toBe('example.com')
   })
 
-  test('returns empty string for undefined', () => {
-    expect(getSourceHost(undefined)).toBe('')
+  test('returns empty string for empty input', () => {
+    expect(getSourceHost('')).toBe('')
   })
 
   test('returns empty string for an invalid URL', () => {

@@ -1,35 +1,13 @@
-export type SourceType = 'url' | 'book' | 'conversation' | 'experience' | 'thought'
+export type { Gleam, Source, SourceType, SourceMedia, MediaKind } from '../../shared/types'
 
-export type MediaKind = 'image' | 'audio' | 'video'
-
-export interface SourceMedia {
-  kind: MediaKind
-  src: string
-}
-
-export interface Source {
-  type: SourceType
-  url?: string
-  title?: string
-  excerpt?: string
-  media?: SourceMedia
-}
-
-export interface Gleam {
-  // Core fields (Immutable)
-  id: string // UUID v7
-  thought: string // The user's understanding
-  source: Source // Reconstructable context
-  created_at: string // ISO 8601 string
-
-  // Derived fields (Mutable)
-  tags?: string[]
-  revisit_count?: number
-  last_revisited_at?: string
-}
+import type { Gleam, Source } from '../../shared/types'
 
 /**
  * Creates a new Gleam object with runtime invariants enforced.
+ *
+ * Core fields (id, thought, source, createdAt) are immutable after creation.
+ * Derived fields (tags, revisitCount, lastRevisitedAt) are mutable and
+ * initialised with sensible defaults.
  */
 export function createGleam(
   id: string,
@@ -49,13 +27,14 @@ export function createGleam(
     thought: thought.trim(),
     source: {
       type: source.type,
-      url: source.url,
-      title: source.title,
-      excerpt: source.excerpt?.trim(),
+      url: source.url ?? '',
+      title: source.title ?? '',
+      excerpt: source.excerpt?.trim() ?? '',
       media: source.media,
     },
-    created_at: createdAt || new Date().toISOString(),
+    createdAt: createdAt || new Date().toISOString(),
     tags: [],
-    revisit_count: 0,
+    revisitCount: 0,
+    lastRevisitedAt: '',
   }
 }

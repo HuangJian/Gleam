@@ -17,7 +17,7 @@ export function formatReviewTime(isoString: string): string {
 }
 
 /** Extract the hostname from a URL, or '' if absent/invalid. */
-export function getSourceHost(url?: string): string {
+export function getSourceHost(url: string): string {
   if (!url) return ''
   try {
     return new URL(url).hostname

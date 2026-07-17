@@ -16,7 +16,7 @@ describe('GleamCard', () => {
   test('shows the excerpt when present', () => {
     const gleam = makeGleam({
       thought: 'Good quote.',
-      source: { type: 'url', url: 'https://x.com', excerpt: 'To be or not to be' },
+      source: { type: 'url', url: 'https://x.com', title: '', excerpt: 'To be or not to be' },
     })
     const { getByText } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
     expect(getByText(/To be or not to be/)).toBeTruthy()
@@ -32,7 +32,7 @@ describe('GleamCard', () => {
   test('shows the source link when a URL is present', () => {
     const gleam = makeGleam({
       thought: 'From an article.',
-      source: { type: 'url', url: 'https://example.com/post', title: 'My Post' },
+      source: { type: 'url', url: 'https://example.com/post', title: 'My Post', excerpt: '' },
     })
     const { getByText } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
     const link = getByText('My Post')
@@ -40,14 +40,14 @@ describe('GleamCard', () => {
     expect(link.getAttribute('href')).toBe('https://example.com/post')
   })
 
-  test('shows a revisit badge when revisit_count > 0', () => {
-    const gleam = makeGleam({ revisit_count: 3 })
+  test('shows a revisit badge when revisitCount > 0', () => {
+    const gleam = makeGleam({ revisitCount: 3 })
     const { getByText } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
     expect(getByText(/3/)).toBeTruthy()
   })
 
-  test('does not show a revisit badge when revisit_count is 0', () => {
-    const gleam = makeGleam({ revisit_count: 0 })
+  test('does not show a revisit badge when revisitCount is 0', () => {
+    const gleam = makeGleam({ revisitCount: 0 })
     const { queryByText } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
     // The badge text is "👁 {count}" — only appears for count > 0.
     expect(queryByText('👁')).toBeNull()

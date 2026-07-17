@@ -24,7 +24,7 @@ export class TagService {
     const gleams = await this.repository.getAll()
     const counts = new Map<string, number>()
     for (const gleam of gleams) {
-      for (const tag of gleam.tags ?? []) {
+      for (const tag of gleam.tags) {
         counts.set(tag, (counts.get(tag) ?? 0) + 1)
       }
     }

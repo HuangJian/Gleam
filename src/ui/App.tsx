@@ -125,7 +125,7 @@ export function App({ repository, shadowHost }: AppProps) {
   const handleAddTag = async (gleamId: string, tag: string) => {
     const gleam = await repository.getById(gleamId)
     if (!gleam) return
-    const next = Array.from(new Set([...(gleam.tags ?? []), tag]))
+    const next = Array.from(new Set([...gleam.tags, tag]))
     await repository.updateDerivedFields(gleamId, { tags: next })
     setViewingGleam({ ...gleam, tags: next })
     await refreshTimeline()
@@ -135,7 +135,7 @@ export function App({ repository, shadowHost }: AppProps) {
   const handleRemoveTag = async (gleamId: string, tag: string) => {
     const gleam = await repository.getById(gleamId)
     if (!gleam) return
-    const next = (gleam.tags ?? []).filter((t) => t !== tag)
+    const next = gleam.tags.filter((t) => t !== tag)
     await repository.updateDerivedFields(gleamId, { tags: next })
     setViewingGleam({ ...gleam, tags: next })
     await refreshTimeline()

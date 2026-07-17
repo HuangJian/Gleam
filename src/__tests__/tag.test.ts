@@ -6,9 +6,11 @@ function makeGleam(overrides: Partial<Gleam> = {}): Gleam {
   return {
     id: 'g1',
     thought: 't',
-    source: { type: 'thought' },
-    created_at: '2026-07-14T10:00:00.000Z',
+    source: { type: 'thought', url: '', title: '', excerpt: '' },
+    createdAt: '2026-07-14T10:00:00.000Z',
     tags: [],
+    revisitCount: 0,
+    lastRevisitedAt: '',
     ...overrides,
   }
 }
@@ -18,7 +20,6 @@ function mockRepo(gleams: Gleam[]) {
     getAll: async () => gleams,
     getById: async (id: string) => gleams.find((g) => g.id === id) ?? null,
     save: async () => {},
-    delete: async () => {},
     updateDerivedFields: async () => {},
     renameTag: async () => {},
   }

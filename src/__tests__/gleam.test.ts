@@ -38,16 +38,16 @@ describe('Gleam Domain Model', () => {
     expect(gleam.thought).toBe('This is my understanding.')
     expect(gleam.source.type).toBe('url')
     expect(gleam.source.excerpt).toBe('An interesting quote')
-    expect(gleam.revisit_count).toBe(0)
+    expect(gleam.revisitCount).toBe(0)
 
-    const time = new Date(gleam.created_at).getTime()
+    const time = new Date(gleam.createdAt).getTime()
     expect(time).toBeGreaterThanOrEqual(Date.now() - 5000)
     expect(time).toBeLessThanOrEqual(Date.now() + 5000)
   })
 
   test('should throw error for empty thoughts', () => {
     const id = generateUUIDv7()
-    const source = { type: 'url' as const, url: 'https://example.com' }
+    const source = { type: 'url' as const, url: 'https://example.com', title: '', excerpt: '' }
 
     expect(() => createGleam(id, '', source)).toThrow('Thought cannot be empty')
     expect(() => createGleam(id, '   ', source)).toThrow('Thought cannot be empty')
@@ -60,6 +60,7 @@ describe('Gleam Domain Model', () => {
       url: 'https://example.com/photo.png',
       title: 'Example Page',
       media: { kind: 'image' as const, src: 'https://example.com/photo.png' },
+      excerpt: '',
     }
 
     const gleam = createGleam(id, 'A visual insight.', source)
@@ -72,7 +73,7 @@ describe('Gleam Domain Model', () => {
 
   test('should leave media undefined when no media is provided', () => {
     const id = generateUUIDv7()
-    const source = { type: 'url' as const, url: 'https://example.com' }
+    const source = { type: 'url' as const, url: 'https://example.com', title: '', excerpt: '' }
 
     const gleam = createGleam(id, 'A thought.', source)
 

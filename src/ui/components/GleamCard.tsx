@@ -26,7 +26,7 @@ export function GleamCard({
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
   }
 
-  const getSourceHost = (url?: string) => {
+  const getSourceHost = (url: string) => {
     if (!url) return ''
     try {
       return new URL(url).hostname
@@ -41,7 +41,7 @@ export function GleamCard({
   }
 
   const countMap = new Map(tagCounts.map((tc) => [tc.tag, tc.count]))
-  const sortedTags = (gleam.tags ?? [])
+  const sortedTags = gleam.tags
     .slice()
     .sort((a, b) => (countMap.get(b) ?? 0) - (countMap.get(a) ?? 0))
 
@@ -49,7 +49,7 @@ export function GleamCard({
     <Card $selected={selected} onClick={handleCardClick}>
       <CardHeader>
         <HeaderLeft>
-          <TimeLabel>{getFormattedTime(gleam.created_at)}</TimeLabel>
+          <TimeLabel>{getFormattedTime(gleam.createdAt)}</TimeLabel>
           {sortedTags.length > 0 && (
             <TagChips>
               {sortedTags.map((tag) => (
@@ -61,9 +61,9 @@ export function GleamCard({
           )}
         </HeaderLeft>
         <HeaderActions>
-          {gleam.revisit_count && gleam.revisit_count > 0 ? (
-            <RevisitBadge title={`回顾次数: ${gleam.revisit_count}`}>
-              👁 {gleam.revisit_count}
+          {gleam.revisitCount > 0 ? (
+            <RevisitBadge title={`回顾次数: ${gleam.revisitCount}`}>
+              👁 {gleam.revisitCount}
             </RevisitBadge>
           ) : null}
         </HeaderActions>

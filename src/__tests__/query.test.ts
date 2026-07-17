@@ -12,10 +12,16 @@ function makeGleam(overrides: Partial<Gleam> = {}): Gleam {
   return {
     id: 'g1',
     thought: 'A flash of understanding.',
-    source: { type: 'url', url: 'https://example.com/article', title: 'Example Article' },
-    created_at: '2026-07-14T10:00:00.000Z',
+    source: {
+      type: 'url',
+      url: 'https://example.com/article',
+      title: 'Example Article',
+      excerpt: '',
+    },
+    createdAt: '2026-07-14T10:00:00.000Z',
     tags: [],
-    revisit_count: 0,
+    revisitCount: 0,
+    lastRevisitedAt: '',
     ...overrides,
   }
 }
@@ -24,23 +30,28 @@ const FIXTURES: Gleam[] = [
   makeGleam({
     id: 'a',
     thought: 'React hooks changed how I think about state.',
-    source: { type: 'url', url: 'https://github.com/facebook/react', title: 'React repo' },
+    source: {
+      type: 'url',
+      url: 'https://github.com/facebook/react',
+      title: 'React repo',
+      excerpt: '',
+    },
     tags: ['react', 'frontend'],
-    created_at: '2026-03-10T09:00:00.000Z',
+    createdAt: '2026-03-10T09:00:00.000Z',
   }),
   makeGleam({
     id: 'b',
     thought: 'A book about deep work and focus.',
-    source: { type: 'book', title: 'Deep Work' },
+    source: { type: 'book', url: '', title: 'Deep Work', excerpt: '' },
     tags: ['productivity'],
-    created_at: '2026-05-20T09:00:00.000Z',
+    createdAt: '2026-05-20T09:00:00.000Z',
   }),
   makeGleam({
     id: 'c',
     thought: 'Machine learning is just statistics with marketing.',
-    source: { type: 'url', url: 'https://arxiv.org/abs/1234', title: 'Paper' },
+    source: { type: 'url', url: 'https://arxiv.org/abs/1234', title: 'Paper', excerpt: '' },
     tags: ['ml', 'ai'],
-    created_at: '2026-07-01T09:00:00.000Z',
+    createdAt: '2026-07-01T09:00:00.000Z',
   }),
 ]
 
@@ -301,7 +312,7 @@ describe('evaluateQuery — relative dates', () => {
   const NOW = new Date(2026, 6, 16, 12, 0, 0, 0) // 2026-07-16 local noon
 
   test('date:today matches only gleams from the current local day', () => {
-    const today = makeGleam({ id: 't', created_at: NOW.toISOString() })
+    const today = makeGleam({ id: 't', createdAt: NOW.toISOString() })
     const r = evaluateQuery(parseQuery('date:today'), [today, ...FIXTURES], NOW)
     expect(r.map((g) => g.id)).toEqual(['t'])
   })
@@ -309,7 +320,7 @@ describe('evaluateQuery — relative dates', () => {
   test('after:this-month matches gleams in the current month', () => {
     const sameMonth = new Date(NOW)
     sameMonth.setDate(2)
-    const m = makeGleam({ id: 'm', created_at: sameMonth.toISOString() })
+    const m = makeGleam({ id: 'm', createdAt: sameMonth.toISOString() })
     // FIXTURES 'c' is 2026-07-01 (also this month), so both should match.
     const r = evaluateQuery(parseQuery('after:this-month'), [m, ...FIXTURES], NOW)
     expect(r.map((g) => g.id).sort()).toEqual(['c', 'm'])
@@ -322,7 +333,6 @@ describe('QueryService', () => {
       getAll: async () => FIXTURES,
       getById: async () => null,
       save: async () => {},
-      delete: async () => {},
       updateDerivedFields: async () => {},
       renameTag: async () => {},
     }

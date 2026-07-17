@@ -62,9 +62,7 @@ export function ReviewRoom({
 
   const countMap = new Map(tagCounts.map((tc) => [tc.tag, tc.count]))
   const sortedTags = viewingGleam
-    ? (viewingGleam.tags ?? [])
-        .slice()
-        .sort((a, b) => (countMap.get(b) ?? 0) - (countMap.get(a) ?? 0))
+    ? viewingGleam.tags.slice().sort((a, b) => (countMap.get(b) ?? 0) - (countMap.get(a) ?? 0))
     : []
 
   const handleCardClick = (gleam: Gleam) => {
@@ -164,11 +162,11 @@ export function ReviewRoom({
                     </HeaderTagChip>
                   ))}
                 </HeaderTags>
-                <DetailTime>{formatReviewTime(viewingGleam.created_at)}</DetailTime>
+                <DetailTime>{formatReviewTime(viewingGleam.createdAt)}</DetailTime>
                 <DetailActions>
-                  {viewingGleam.revisit_count && viewingGleam.revisit_count > 0 ? (
-                    <RevisitBadge title={`回顾次数: ${viewingGleam.revisit_count}`}>
-                      👁 {viewingGleam.revisit_count}
+                  {viewingGleam.revisitCount > 0 ? (
+                    <RevisitBadge title={`回顾次数: ${viewingGleam.revisitCount}`}>
+                      👁 {viewingGleam.revisitCount}
                     </RevisitBadge>
                   ) : null}
                   <DetailCloseButton onClick={onCloseDetail} title="关闭详情">
@@ -208,7 +206,7 @@ export function ReviewRoom({
                 )}
 
                 <TagEditor
-                  tags={viewingGleam.tags ?? []}
+                  tags={viewingGleam.tags}
                   tagCounts={tagCounts}
                   onAdd={(tag) => onAddTag(viewingGleam.id, tag)}
                 />

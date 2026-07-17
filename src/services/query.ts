@@ -11,10 +11,10 @@ import { getSourceHost } from '../utils/review'
  *   type:book           exact SourceType match (url/book/conversation/experience/thought)
  *   title:foo           substring match on source.title
  *   text:foo            substring match on thought + source.excerpt
- *   >=20260101          created_at local date >= value (alias: after:, from:)
- *   <=20260630          created_at local date <= value (alias: before:, to:)
+ *   >=20260101          createdAt local date >= value (alias: after:, from:)
+ *   <=20260630          createdAt local date <= value (alias: before:, to:)
  *   >20260101 <20260630 same as >= / <= (strict also accepted)
- *   date:20260315       created_at on that exact day
+ *   date:20260315       createdAt on that exact day
  *   in:2026             whole-year range (>=20260101 and <=20261231)
  *   ~this-year          alias for in:<current year>
  *   ~2020               year range 2020
@@ -498,37 +498,33 @@ function matchTerm(node: Extract<QueryNode, { kind: 'term' }>, g: Gleam, now: Da
   const v = node.value.toLowerCase()
   switch (node.field) {
     case 'tag':
-      return (g.tags ?? []).some((t) => t.toLowerCase() === v)
+      return g.tags.some((t) => t.toLowerCase() === v)
     case 'domain':
       return getSourceHost(g.source.url).toLowerCase().includes(v)
     case 'type':
       return g.source.type.toLowerCase() === v
     case 'title':
-      return (g.source.title ?? '').toLowerCase().includes(v)
+      return g.source.title.toLowerCase().includes(v)
     case 'text':
-      return (
-        g.thought.toLowerCase().includes(v) || (g.source.excerpt ?? '').toLowerCase().includes(v)
-      )
+      return g.thought.toLowerCase().includes(v) || g.source.excerpt.toLowerCase().includes(v)
     case 'after':
     case 'from':
       return (
-        formatLocalDate(new Date(g.created_at)) >=
-        formatLocalDate(resolveDateValue(node.value, now))
+        formatLocalDate(new Date(g.createdAt)) >= formatLocalDate(resolveDateValue(node.value, now))
       )
     case 'before':
     case 'to':
       return (
-        formatLocalDate(new Date(g.created_at)) <=
-        formatLocalDate(resolveDateValue(node.value, now))
+        formatLocalDate(new Date(g.createdAt)) <= formatLocalDate(resolveDateValue(node.value, now))
       )
     case 'date':
       return (
-        formatLocalDate(new Date(g.created_at)) ===
+        formatLocalDate(new Date(g.createdAt)) ===
         formatLocalDate(resolveDateValue(node.value, now))
       )
     case 'in': {
       const { start, end } = resolvePeriod(node.value, now)
-      const d = formatLocalDate(new Date(g.created_at))
+      const d = formatLocalDate(new Date(g.createdAt))
       return d >= formatLocalDate(start) && d <= formatLocalDate(end)
     }
   }
@@ -538,15 +534,13 @@ function evalNode(node: QueryNode, g: Gleam, now: Date): boolean {
   switch (node.kind) {
     case 'keyword': {
       const v = node.value.toLowerCase()
-      const hay = [g.thought, ...(g.tags ?? []), g.source.title ?? '', g.source.excerpt ?? '']
-        .join('\n')
-        .toLowerCase()
+      const hay = [g.thought, ...g.tags, g.source.title, g.source.excerpt].join('\n').toLowerCase()
       return hay.includes(v)
     }
     case 'term':
       return matchTerm(node, g, now)
     case 'datecmp': {
-      const d = formatLocalDate(new Date(g.created_at))
+      const d = formatLocalDate(new Date(g.createdAt))
       const target = formatLocalDate(resolveDateValue(node.value, now))
       switch (node.op) {
         case '>=':
@@ -561,7 +555,7 @@ function evalNode(node: QueryNode, g: Gleam, now: Date): boolean {
     }
     case 'period': {
       const { start, end } = resolvePeriod(node.value, now)
-      const d = formatLocalDate(new Date(g.created_at))
+      const d = formatLocalDate(new Date(g.createdAt))
       return d >= formatLocalDate(start) && d <= formatLocalDate(end)
     }
     case 'not':

@@ -24,18 +24,16 @@ export class CaptureService {
     // or a custom source — not for pure thoughts without page context
     const hasExcerpt = !!(excerpt || customSource?.excerpt)
     const sourceUrl =
-      customSource?.url ||
-      (hasExcerpt && typeof window !== 'undefined' ? window.location.href : undefined)
+      customSource?.url || (hasExcerpt && typeof window !== 'undefined' ? window.location.href : '')
     const sourceTitle =
-      customSource?.title ||
-      (hasExcerpt && typeof document !== 'undefined' ? document.title : undefined)
+      customSource?.title || (hasExcerpt && typeof document !== 'undefined' ? document.title : '')
     const sourceType: SourceType = customSource?.type || (sourceUrl ? 'url' : 'thought')
 
     const source: Source = {
       type: sourceType,
       url: sourceUrl,
       title: sourceTitle,
-      excerpt: excerpt || customSource?.excerpt,
+      excerpt: excerpt || customSource?.excerpt || '',
       media: customSource?.media,
     }
 

@@ -9,9 +9,12 @@ export function makeGleam(overrides: Partial<Gleam> = {}): Gleam {
       type: 'url',
       url: 'https://example.com/article',
       title: 'Example Article',
+      excerpt: '',
     },
-    created_at: '2026-07-14T10:00:00.000Z',
-    revisit_count: 0,
+    createdAt: '2026-07-14T10:00:00.000Z',
+    tags: [],
+    revisitCount: 0,
+    lastRevisitedAt: '',
     ...overrides,
   }
 }

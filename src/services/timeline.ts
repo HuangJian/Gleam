@@ -29,7 +29,7 @@ export class TimelineService {
     const groupsMap: Record<string, Gleam[]> = {}
 
     for (const gleam of gleams) {
-      const date = new Date(gleam.created_at)
+      const date = new Date(gleam.createdAt)
       const dateLabel = this.formatDateLabel(date)
       if (!groupsMap[dateLabel]) {
         groupsMap[dateLabel] = []
@@ -41,7 +41,7 @@ export class TimelineService {
       dateLabel,
       // Ensure they are sorted by date descending inside each group
       gleams: items.sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       ),
     }))
   }
@@ -53,10 +53,10 @@ export class TimelineService {
     const gleam = await this.repository.getById(id)
     if (!gleam) return
 
-    const currentCount = gleam.revisit_count || 0
+    const currentCount = gleam.revisitCount
     await this.repository.updateDerivedFields(id, {
-      revisit_count: currentCount + 1,
-      last_revisited_at: new Date().toISOString(),
+      revisitCount: currentCount + 1,
+      lastRevisitedAt: new Date().toISOString(),
     })
   }
 

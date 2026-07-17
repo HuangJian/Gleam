@@ -89,23 +89,15 @@ export class GMStorageAdapter implements IRepository {
   public async getAll(): Promise<Gleam[]> {
     const records = this.loadRecords()
     // Sort chronologically (UUID v7 inherently sorts chronologically by time part,
-    // but sorting by created_at ISO string or time extraction is safer and explicit)
+    // but sorting by createdAt ISO string or time extraction is safer and explicit)
     return Object.values(records).sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
-  }
-
-  public async delete(id: string): Promise<void> {
-    const records = this.loadRecords()
-    if (records[id]) {
-      delete records[id]
-      this.saveRecords(records)
-    }
   }
 
   public async updateDerivedFields(
     id: string,
-    updates: Partial<Pick<Gleam, 'tags' | 'revisit_count' | 'last_revisited_at'>>,
+    updates: Partial<Pick<Gleam, 'tags' | 'revisitCount' | 'lastRevisitedAt'>>,
   ): Promise<void> {
     const records = this.loadRecords()
     const gleam = records[id]
@@ -117,11 +109,11 @@ export class GMStorageAdapter implements IRepository {
     if (updates.tags !== undefined) {
       gleam.tags = updates.tags
     }
-    if (updates.revisit_count !== undefined) {
-      gleam.revisit_count = updates.revisit_count
+    if (updates.revisitCount !== undefined) {
+      gleam.revisitCount = updates.revisitCount
     }
-    if (updates.last_revisited_at !== undefined) {
-      gleam.last_revisited_at = updates.last_revisited_at
+    if (updates.lastRevisitedAt !== undefined) {
+      gleam.lastRevisitedAt = updates.lastRevisitedAt
     }
 
     records[id] = gleam
@@ -138,9 +130,8 @@ export class GMStorageAdapter implements IRepository {
     const records = this.loadRecords()
     let changed = false
     for (const gleam of Object.values(records)) {
-      const tags = gleam.tags ?? []
-      if (!tags.includes(normalizedOld)) continue
-      const next = tags.filter((t) => t !== normalizedOld).concat(normalizedNew)
+      if (!gleam.tags.includes(normalizedOld)) continue
+      const next = gleam.tags.filter((t) => t !== normalizedOld).concat(normalizedNew)
       gleam.tags = Array.from(new Set(next))
       records[gleam.id] = gleam
       changed = true
