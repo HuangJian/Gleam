@@ -14,7 +14,7 @@ import type {
   TimelineResult,
 } from './repository'
 import { generateHighlight } from '../search/highlight'
-import { tokenize } from '../search/tokenizer'
+import { parseQuery, evaluateQuery, extractKeywords } from '@shared/query'
 
 const MAX_BATCH_SIZE = 100
 
@@ -234,74 +234,50 @@ export class SqliteRepository implements IRepository {
   }
 
   // ── Search ───────────────────────────────────────────
+  //
+  // Uses the shared query language (shared/query.ts) to evaluate the query
+  // against all gleams in TypeScript. This supports the full query syntax
+  // (#tag, domain:, date operators, boolean logic, periods) identically on
+  // both client and backend.
+  //
+  // For Gleam's expected scale (thousands of gleams), loading all rows and
+  // filtering in TS is in the millisecond range. The FTS5 index is retained
+  // in the schema but not used for search — it can be re-engaged later if
+  // data volume grows significantly.
 
   async search(query: string, limit: number = 20, offset: number = 0): Promise<SearchResult> {
-    const tokens = tokenize(query)
-    if (tokens.length === 0) {
+    const ast = parseQuery(query)
+    if (!ast) {
       return { total: 0, items: [] }
     }
 
-    const ftsQuery = tokens.map((t) => `"${t.replace(/"/g, '""')}"`).join(' OR ')
+    // Load all gleams (join core + derived), newest first.
+    const allRows = this.db.select().from(gleams).orderBy(desc(gleams.createdAt)).all()
+    const allGleams = allRows.map((row) => this.joinGleam(row))
 
-    const WEIGHTS = { thought: 10, sourceTitle: 6, tags: 4, sourceExcerpt: 2, sourceUrl: 1 }
+    // Filter using the shared query evaluator.
+    const matched = evaluateQuery(ast, allGleams)
 
-    const rows = this.sqlite
-      .prepare(
-        `SELECT
-           f.gleam_id,
-           f.thought,
-           f.source_title,
-           f.source_excerpt,
-           f.source_url,
-           f.tags,
-           rank
-         FROM gleams_fts f
-         WHERE gleams_fts MATCH ?
-         ORDER BY rank
-         LIMIT ? OFFSET ?`,
-      )
-      .all(ftsQuery, limit, offset) as FtsRow[]
+    const total = matched.length
+    const items = matched.slice(offset, offset + limit)
 
-    const totalRow = this.sqlite
-      .prepare(`SELECT count(*) as count FROM gleams_fts WHERE gleams_fts MATCH ?`)
-      .get(ftsQuery) as { count: number }
+    // Generate highlights from keyword nodes only (not filter values).
+    const keywords = extractKeywords(ast)
+    const hits: SearchHit[] = items.map((gleam) => ({
+      gleam,
+      score: 1,
+      highlight:
+        keywords.length > 0
+          ? generateHighlight(keywords, [
+              { text: gleam.thought, weight: 10 },
+              { text: gleam.source.title, weight: 6 },
+              { text: gleam.tags.join(' '), weight: 4 },
+              { text: gleam.source.excerpt, weight: 2 },
+            ])
+          : null,
+    }))
 
-    const hits: SearchHit[] = []
-    for (const row of rows) {
-      const core = this.db.select().from(gleams).where(eq(gleams.id, row.gleam_id)).get()
-      if (!core) continue
-
-      const derived = this.db
-        .select()
-        .from(gleamDerived)
-        .where(eq(gleamDerived.gleamId, row.gleam_id))
-        .get()
-
-      const source = JSON.parse(core.source) as Source
-      const tags = derived ? (JSON.parse(derived.tags) as string[]) : []
-
-      const gleam: Gleam = {
-        id: core.id,
-        thought: core.thought,
-        source,
-        createdAt: core.createdAt,
-        tags,
-        revisitCount: derived?.revisitCount ?? 0,
-        lastRevisitedAt: derived?.lastRevisitedAt ?? '',
-      }
-
-      const score = computeScore(row, WEIGHTS)
-      const highlight = generateHighlight(query, [
-        { text: core.thought, weight: WEIGHTS.thought },
-        { text: source.title, weight: WEIGHTS.sourceTitle },
-        { text: tags.join(' '), weight: WEIGHTS.tags },
-        { text: source.excerpt, weight: WEIGHTS.sourceExcerpt },
-      ])
-
-      hits.push({ gleam, score, highlight })
-    }
-
-    return { total: totalRow.count, items: hits }
+    return { total, items: hits }
   }
 
   // ── Single gleam ─────────────────────────────────────
@@ -369,38 +345,4 @@ export class SqliteRepository implements IRepository {
         tags.join(' '),
       )
   }
-}
-
-// ── FTS row type ────────────────────────────────────────
-
-interface FtsRow {
-  gleam_id: string
-  thought: string
-  source_title: string
-  source_excerpt: string
-  source_url: string
-  tags: string
-  rank: number
-}
-
-// ── Score computation ───────────────────────────────────
-
-function computeScore(
-  row: FtsRow,
-  weights: {
-    thought: number
-    sourceTitle: number
-    tags: number
-    sourceExcerpt: number
-    sourceUrl: number
-  },
-): number {
-  const ftsScore = 1 / (1 + Math.abs(row.rank))
-  const fieldBonus =
-    (row.thought ? weights.thought : 0) +
-    (row.source_title ? weights.sourceTitle : 0) +
-    (row.tags ? weights.tags : 0) +
-    (row.source_excerpt ? weights.sourceExcerpt : 0) +
-    (row.source_url ? weights.sourceUrl : 0)
-  return ftsScore * fieldBonus
 }

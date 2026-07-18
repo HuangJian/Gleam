@@ -3,6 +3,9 @@
  * are trivially unit-testable.
  */
 
+// Re-export getSourceHost from the shared query module (single source of truth).
+export { getSourceHost } from '../../shared/query'
+
 /** Format an ISO timestamp for display in the review detail header. */
 export function formatReviewTime(isoString: string): string {
   const d = new Date(isoString)
@@ -14,14 +17,4 @@ export function formatReviewTime(isoString: string): string {
     minute: '2-digit',
     hour12: false,
   })
-}
-
-/** Extract the hostname from a URL, or '' if absent/invalid. */
-export function getSourceHost(url: string): string {
-  if (!url) return ''
-  try {
-    return new URL(url).hostname
-  } catch {
-    return ''
-  }
 }

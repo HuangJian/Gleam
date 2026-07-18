@@ -1,21 +1,24 @@
 import { useState, useEffect } from 'preact/hooks'
-import { Gleam } from '../domain/gleam'
+import { Gleam, SourceMedia } from '../domain/gleam'
 import { IRepository } from '../domain/repository'
 import { CaptureService } from '../services/capture'
-import { TimelineService, TimelineGroup } from '../services/timeline'
-import { TagService, TagCount } from '../services/tag'
+import { groupByDate, TimelineGroup } from '../services/timeline'
+import { countTags, TagCount } from '../services/tag'
+import { SyncService, SyncState } from '../services/sync'
+import { getServerConfig, setServerUrl } from '../infra/server-config'
 import { CaptureTrigger } from './components/CaptureTrigger'
 import { CapturePanel } from './components/CapturePanel'
 import { ReviewRoom } from './components/ReviewRoom'
 import { ReviewFAB } from './components/ReviewFAB'
-import { SourceMedia } from '../domain/gleam'
+import { SettingsPanel } from './components/SettingsPanel'
 
 interface AppProps {
   repository: IRepository
+  syncService: SyncService
   shadowHost: HTMLElement
 }
 
-export function App({ repository, shadowHost }: AppProps) {
+export function App({ repository, syncService, shadowHost }: AppProps) {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false)
   const [isReviewOpen, setIsReviewOpen] = useState(false)
   const [activeExcerptText, setActiveExcerptText] = useState('')
@@ -27,25 +30,38 @@ export function App({ repository, shadowHost }: AppProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [viewingGleam, setViewingGleam] = useState<Gleam | null>(null)
   const [tagCounts, setTagCounts] = useState<TagCount[]>([])
+  const [syncState, setSyncState] = useState<SyncState>(syncService.getState())
+  const [highlights, setHighlights] = useState<Record<string, string | null>>({})
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const captureService = new CaptureService(repository)
-  const timelineService = new TimelineService(repository)
-  const tagService = new TagService(repository)
 
-  // Load and refresh timeline
-  const refreshTimeline = async (query = searchQuery) => {
-    const groups = await timelineService.getTimeline(query)
-    setTimelineGroups(groups)
-  }
-
-  // Refresh the global tag vocabulary (counts) after any tag mutation.
-  const refreshTags = async () => {
-    setTagCounts(await tagService.getAllTagCounts())
-  }
-
+  // Subscribe to sync state updates
   useEffect(() => {
-    refreshTags()
+    const unsub = syncService.subscribe(setSyncState)
+    return unsub
   }, [])
+
+  // Load timeline (and tag counts when unfiltered)
+  const refreshTimeline = async (query = searchQuery) => {
+    let gleams: Gleam[]
+    const newHighlights: Record<string, string | null> = {}
+    if (query && query.trim() !== '') {
+      const result = await syncService.search(query)
+      gleams = result.items.map((h) => {
+        newHighlights[h.gleam.id] = h.highlight
+        return h.gleam
+      })
+      setHighlights(newHighlights)
+    } else {
+      const result = await syncService.getTimeline()
+      gleams = result.items
+      setHighlights({})
+      // Recompute tag counts from the full (unfiltered) timeline
+      setTagCounts(countTags(gleams))
+    }
+    setTimelineGroups(groupByDate(gleams))
+  }
 
   useEffect(() => {
     refreshTimeline()
@@ -93,6 +109,8 @@ export function App({ repository, shadowHost }: AppProps) {
       excerpt || undefined,
       activeMedia ? { media: activeMedia, url: activeMedia.src, title: document.title } : undefined,
     )
+    // Trigger async upload to server (non-blocking — falls back to local on failure)
+    await syncService.onGleamCaptured()
     await refreshTimeline()
     setIsCaptureOpen(false)
     setActiveExcerptText('')
@@ -117,35 +135,42 @@ export function App({ repository, shadowHost }: AppProps) {
   }
 
   const handleRevisitGleam = async (id: string) => {
-    await timelineService.recordRevisit(id)
-    // Don't full refresh to avoid scroll jump, just update count locally or refresh quietly
+    // Find the gleam in current timeline to read the current revisit count
+    const gleam = timelineGroups.flatMap((g) => g.gleams).find((g) => g.id === id)
+    if (!gleam) return
+    const nextCount = gleam.revisitCount + 1
+    await syncService.updateDerivedFields(id, {
+      revisitCount: nextCount,
+      lastRevisitedAt: new Date().toISOString(),
+    })
+    setViewingGleam({ ...gleam, revisitCount: nextCount })
     await refreshTimeline()
   }
 
   const handleAddTag = async (gleamId: string, tag: string) => {
-    const gleam = await repository.getById(gleamId)
+    const gleam =
+      viewingGleam ?? timelineGroups.flatMap((g) => g.gleams).find((g) => g.id === gleamId)
     if (!gleam) return
     const next = Array.from(new Set([...gleam.tags, tag]))
-    await repository.updateDerivedFields(gleamId, { tags: next })
+    await syncService.updateDerivedFields(gleamId, { tags: next })
     setViewingGleam({ ...gleam, tags: next })
     await refreshTimeline()
-    await refreshTags()
   }
 
   const handleRemoveTag = async (gleamId: string, tag: string) => {
-    const gleam = await repository.getById(gleamId)
+    const gleam =
+      viewingGleam ?? timelineGroups.flatMap((g) => g.gleams).find((g) => g.id === gleamId)
     if (!gleam) return
     const next = gleam.tags.filter((t) => t !== tag)
-    await repository.updateDerivedFields(gleamId, { tags: next })
+    await syncService.updateDerivedFields(gleamId, { tags: next })
     setViewingGleam({ ...gleam, tags: next })
     await refreshTimeline()
-    await refreshTags()
   }
 
   const handleExportData = async () => {
     try {
-      const allGleams = await repository.getAll()
-      const dataStr = JSON.stringify(allGleams, null, 2)
+      const result = await syncService.getTimeline({ limit: 10000 })
+      const dataStr = JSON.stringify(result.items, null, 2)
       const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr)
 
       const exportFileDefaultName = `gleam_export_${new Date().toISOString().slice(0, 10)}.json`
@@ -205,6 +230,23 @@ export function App({ repository, shadowHost }: AppProps) {
         tagCounts={tagCounts}
         onAddTag={handleAddTag}
         onRemoveTag={handleRemoveTag}
+        syncState={syncState}
+        highlights={highlights}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
+
+      {/* Settings Panel Modal */}
+      <SettingsPanel
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        syncState={syncState}
+        serverUrl={getServerConfig().url}
+        onSaveUrl={(url) => setServerUrl(url)}
+        onTestConnection={() => syncService.testConnection()}
+        onSyncNow={async () => {
+          await syncService.syncPending()
+          await refreshTimeline()
+        }}
       />
     </>
   )

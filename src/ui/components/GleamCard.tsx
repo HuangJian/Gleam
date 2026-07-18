@@ -4,7 +4,9 @@ import { theme } from '../theme'
 import { MarkdownPreview } from './MarkdownPreview'
 import { MediaPreview } from './MediaPreview'
 import { SourceExcerpt } from './SourceExcerpt'
+import { HighlightText } from './HighlightText'
 import { TagCount } from '../../services/tag'
+import { getSourceHost } from '../../utils/review'
 
 interface GleamCardProps {
   gleam: Gleam
@@ -12,6 +14,7 @@ interface GleamCardProps {
   onClick?: (gleam: Gleam) => void
   selected?: boolean
   tagCounts?: TagCount[]
+  highlight?: string | null
 }
 
 export function GleamCard({
@@ -20,19 +23,11 @@ export function GleamCard({
   onClick,
   selected = false,
   tagCounts = [],
+  highlight = null,
 }: GleamCardProps) {
   const getFormattedTime = (isoString: string) => {
     const d = new Date(isoString)
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-  }
-
-  const getSourceHost = (url: string) => {
-    if (!url) return ''
-    try {
-      return new URL(url).hostname
-    } catch {
-      return ''
-    }
   }
 
   const handleCardClick = () => {
@@ -70,7 +65,11 @@ export function GleamCard({
       </CardHeader>
 
       <ThoughtText>
-        <MarkdownPreview content={gleam.thought} compact />
+        {highlight ? (
+          <HighlightText text={highlight} />
+        ) : (
+          <MarkdownPreview content={gleam.thought} compact />
+        )}
       </ThoughtText>
 
       {gleam.source.excerpt && <SourceExcerpt text={gleam.source.excerpt} compact />}

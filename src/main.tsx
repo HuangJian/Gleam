@@ -3,11 +3,20 @@ import createCache from '@emotion/cache'
 import { CacheProvider } from '@emotion/react'
 import { App } from './ui/App'
 import { GMStorageAdapter } from './infra/gm-storage'
+import { ServerClient } from './infra/server-client'
+import { getServerConfig } from './infra/server-config'
+import { SyncService } from './services/sync'
 
 declare function GM_registerMenuCommand(name: string, fn: () => void, accessKey?: string): void
 
-// 1. Initialize the stable Repository layer
+// 1. Initialize the stable Repository layer (local cache + domain storage)
 const repository = new GMStorageAdapter()
+
+// 2. Initialize the server client (GraphQL via GM_xmlhttpRequest)
+const serverClient = new ServerClient(getServerConfig)
+
+// 3. Initialize the SyncService (orchestrates local cache + remote server)
+const syncService = new SyncService(repository, serverClient)
 
 // 2. Inject modern fonts into the main document head (so browser loads them)
 function injectFonts() {
@@ -55,7 +64,7 @@ function initApp() {
   // 5. Render Preact App inside CacheProvider
   render(
     <CacheProvider value={emotionCache}>
-      <App repository={repository} shadowHost={host} />
+      <App repository={repository} syncService={syncService} shadowHost={host} />
     </CacheProvider>,
     appContainer,
   )

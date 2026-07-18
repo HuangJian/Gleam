@@ -9,6 +9,7 @@ import { MediaPreview } from './MediaPreview'
 import { SourceExcerpt } from './SourceExcerpt'
 import { TagEditor } from './TagEditor'
 import { TagCount } from '../../services/tag'
+import type { SyncState } from '../../services/sync'
 import { theme } from '../theme'
 import { METEOR_ICON_URL } from '../assets'
 import { formatReviewTime, getSourceHost } from '../../utils/review'
@@ -27,6 +28,9 @@ interface ReviewRoomProps {
   tagCounts: TagCount[]
   onAddTag: (gleamId: string, tag: string) => Promise<void>
   onRemoveTag: (gleamId: string, tag: string) => Promise<void>
+  syncState: SyncState
+  highlights: Record<string, string | null>
+  onOpenSettings: () => void
 }
 
 export function ReviewRoom({
@@ -43,6 +47,9 @@ export function ReviewRoom({
   tagCounts,
   onAddTag,
   onRemoveTag,
+  syncState,
+  highlights,
+  onOpenSettings,
 }: ReviewRoomProps) {
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -80,6 +87,12 @@ export function ReviewRoom({
               <span>拾光 · 认知演化的轨迹</span>
             </HeaderTitle>
             <HeaderActions>
+              <SyncIndicator onClick={onOpenSettings} title="同步状态与设置">
+                <SyncDot $status={syncState.status} />
+                {syncState.pendingCount > 0 && (
+                  <PendingBadge>{syncState.pendingCount}</PendingBadge>
+                )}
+              </SyncIndicator>
               <AddButton onClick={onAddGleam} title="添加拾光 (无来源)">
                 <svg viewBox="0 0 24 24">
                   <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
@@ -131,6 +144,7 @@ export function ReviewRoom({
                           tagCounts={tagCounts}
                           onRevisit={onRevisitGleam}
                           onClick={handleCardClick}
+                          highlight={highlights[gleam.id] ?? null}
                         />
                       ))}
                     </GleamList>
@@ -318,6 +332,57 @@ const HeaderActions = styled.div`
   display: flex;
   align-items: center;
   gap: 12px;
+`
+
+const SyncIndicator = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  position: relative;
+  transition: ${theme.animations.transition};
+
+  &:hover {
+    opacity: 0.7;
+  }
+`
+
+const SyncDot = styled.span<{ $status: string }>`
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: ${(p) =>
+    p.$status === 'connected'
+      ? theme.colors.text.success
+      : p.$status === 'syncing'
+        ? theme.colors.text.warning
+        : theme.colors.text.error};
+  flex-shrink: 0;
+  ${(p) => p.$status === 'syncing' && `animation: pulse 1s ease-in-out infinite;`}
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.4;
+    }
+  }
+`
+
+const PendingBadge = styled.span`
+  font-size: 10px;
+  font-weight: 600;
+  background: ${theme.colors.text.warning};
+  color: white;
+  border-radius: 8px;
+  padding: 1px 5px;
+  min-width: 16px;
+  text-align: center;
 `
 
 const AddButton = styled.button`

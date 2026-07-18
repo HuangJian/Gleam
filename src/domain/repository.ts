@@ -33,3 +33,21 @@ export interface IRepository {
    */
   renameTag(oldTag: string, newTag: string): Promise<void>
 }
+
+/**
+ * Local cache management for the "thin cache" sync model.
+ *
+ * The local GM_storage holds only gleams that haven't been successfully
+ * uploaded to the server yet. Once a gleam is confirmed on the server,
+ * `clearSynced` removes it from the local cache.
+ *
+ * This is NOT a domain delete — the gleam continues to exist in the server
+ * archive. It only removes the local cached copy that was pending upload.
+ */
+export interface ILocalCache {
+  /**
+   * Removes gleams that have been successfully uploaded to the server.
+   * @param ids - UUIDs of gleams confirmed on the server.
+   */
+  clearSynced(ids: string[]): Promise<void>
+}

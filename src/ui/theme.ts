@@ -17,6 +17,8 @@ export const theme = {
       muted: 'hsl(35, 12%, 60%)', // Light warm gray
       accent: 'hsl(30, 80%, 45%)', // Amber gold
       success: 'hsl(145, 60%, 40%)',
+      error: 'hsl(0, 60%, 50%)', // Warm red for disconnected/error
+      warning: 'hsl(38, 85%, 48%)', // Gold for syncing/pending
     },
     brand: {
       primary: 'hsl(38, 85%, 48%)', // Gleam Amber Gold

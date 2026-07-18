@@ -31,6 +31,13 @@ async function main() {
     context,
     graphqlEndpoint: '/graphql',
     landingPage: false,
+    // Allow cross-origin requests so the UserScript (and browser-based testing)
+    // can reach the GraphQL endpoint. GM_xmlhttpRequest bypasses CORS, but
+    // enabling it here allows direct browser fetch for development/testing.
+    cors: {
+      origin: ['*'],
+      methods: ['POST', 'GET', 'OPTIONS'],
+    },
   })
 
   const server = Bun.serve({

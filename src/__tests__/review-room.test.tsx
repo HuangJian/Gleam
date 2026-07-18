@@ -5,6 +5,13 @@ import { TimelineGroup } from '../services/timeline'
 import { TagCount } from '../services/tag'
 import { makeGleam } from './helpers'
 
+const mockSyncState = {
+  status: 'disconnected' as const,
+  pendingCount: 0,
+  lastSyncAt: null,
+  error: null,
+}
+
 function minimalProps(overrides: Record<string, unknown> = {}) {
   return {
     isOpen: true,
@@ -20,6 +27,9 @@ function minimalProps(overrides: Record<string, unknown> = {}) {
     tagCounts: [] as TagCount[],
     onAddTag: vi.fn().mockResolvedValue(undefined),
     onRemoveTag: vi.fn().mockResolvedValue(undefined),
+    syncState: mockSyncState,
+    highlights: {} as Record<string, string | null>,
+    onOpenSettings: vi.fn(),
     ...overrides,
   }
 }

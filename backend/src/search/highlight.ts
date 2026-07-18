@@ -1,5 +1,3 @@
-import { tokenize } from './tokenizer'
-
 export interface HighlightField {
   text: string
   weight: number
@@ -9,16 +7,22 @@ export interface HighlightField {
  * Generates a highlight snippet from search results.
  * Finds the first field with a match and returns a snippet around it.
  *
+ * @param keywords - pre-extracted keyword strings from the query AST
+ *   (use `extractKeywords(ast)` from `shared/query.ts`). These are matched as
+ *   substrings against each field's text. Filter values (#tag, domain:, date
+ *   operators) are excluded — they match structurally, not as text substrings.
+ *
  * This is implemented in TypeScript (not SQL) for:
  * - identical output across databases
  * - identical rendering across clients
  * - simpler testing
+ * - easier future migration
  */
-export function generateHighlight(query: string, fields: HighlightField[]): string | null {
-  const tokens = tokenize(query)
-  if (tokens.length === 0) return null
+export function generateHighlight(keywords: string[], fields: HighlightField[]): string | null {
+  if (keywords.length === 0) return null
 
-  const lowerTokens = tokens.map((t) => t.toLowerCase())
+  const lowerKeywords = keywords.map((k) => k.toLowerCase()).filter((k) => k.length > 0)
+  if (lowerKeywords.length === 0) return null
 
   // Search fields in priority order (highest weight first)
   const sortedFields = [...fields].sort((a, b) => b.weight - a.weight)
@@ -27,19 +31,19 @@ export function generateHighlight(query: string, fields: HighlightField[]): stri
     if (!field.text) continue
     const lower = field.text.toLowerCase()
 
-    // Find the first matching token
+    // Find the first matching keyword (earliest position wins)
     let bestPos = -1
-    let bestToken = ''
-    for (const token of lowerTokens) {
-      const pos = lower.indexOf(token)
+    let bestKeyword = ''
+    for (const keyword of lowerKeywords) {
+      const pos = lower.indexOf(keyword)
       if (pos >= 0 && (bestPos < 0 || pos < bestPos)) {
         bestPos = pos
-        bestToken = token
+        bestKeyword = keyword
       }
     }
 
     if (bestPos >= 0) {
-      return buildSnippet(field.text, bestPos, bestToken)
+      return buildSnippet(field.text, bestPos, bestKeyword)
     }
   }
 
