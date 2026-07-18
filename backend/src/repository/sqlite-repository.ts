@@ -14,7 +14,7 @@ import type {
   TimelineResult,
 } from './repository'
 import { generateHighlight } from '../search/highlight'
-import { parseQuery, evaluateQuery, extractKeywords } from '@shared/query'
+import { parseQuery, evaluateQuery, extractKeywords, QueryParseError } from '@shared/query'
 
 const MAX_BATCH_SIZE = 100
 
@@ -246,7 +246,20 @@ export class SqliteRepository implements IRepository {
   // data volume grows significantly.
 
   async search(query: string, limit: number = 20, offset: number = 0): Promise<SearchResult> {
-    const ast = parseQuery(query)
+    // Mirror the client's runQuery: a malformed query (e.g. a bare "#"
+    // with no value) throws QueryParseError. Instead of surfacing it as a
+    // hard GraphQLError, fall back to a plain free-text match over the raw
+    // input so the search box never breaks.
+    let ast: ReturnType<typeof parseQuery>
+    try {
+      ast = parseQuery(query)
+    } catch (e) {
+      if (e instanceof QueryParseError) {
+        ast = { kind: 'keyword', value: query }
+      } else {
+        throw e
+      }
+    }
     if (!ast) {
       return { total: 0, items: [] }
     }

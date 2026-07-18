@@ -283,6 +283,21 @@ describe('SqliteRepository.search', () => {
 
   // ── Rich query language (shared/query.ts) ────────────
 
+  test('does NOT throw on malformed query (bare "#") — falls back to free-text', async () => {
+    const g1 = makeGleam({
+      id: '01978a3e-0001-7c3d-8e4f-5a6b7c8d9e0f',
+      thought: 'A thought about react',
+    })
+    await repo.appendGleams([g1])
+
+    // A bare "#" with no value is a QueryParseError. The backend must not
+    // surface it as a GraphQLError — it should fall back to free-text like
+    // the client's runQuery does.
+    await expect(repo.search('#')).resolves.toBeDefined()
+    const result = await repo.search('#')
+    expect(Array.isArray(result.items)).toBe(true)
+  })
+
   test('finds gleams by #tag syntax', async () => {
     const g1 = makeGleam({
       id: '01978a3e-0001-7c3d-8e4f-5a6b7c8d9e0f',
