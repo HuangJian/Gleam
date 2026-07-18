@@ -47,6 +47,33 @@ describe('ReviewRoom', () => {
     expect(getByText('微光待启')).toBeTruthy()
   })
 
+  test('shows query examples when a custom query matches nothing', async () => {
+    const onSearch = vi.fn()
+    const { getByPlaceholderText, getByText } = render(
+      <ReviewRoom {...minimalProps({ onSearch })} />,
+    )
+    // Type a custom query that yields no results.
+    fireEvent.input(
+      getByPlaceholderText(
+        '搜索：关键字 / tag:react / domain:github.com / type:book / after:2026-01-01 ...',
+      ),
+      { target: { value: 'zzz-nomatch' } },
+    )
+    await waitFor(() => expect(getByText('没有匹配的微光，试试这些查询：')).toBeTruthy())
+    expect(getByText('#family')).toBeTruthy()
+    expect(getByText('标签为 family 的微光')).toBeTruthy()
+  })
+
+  test('shows the empty state (not examples) for a preset range with no results', () => {
+    // Default range is a preset (近三天), so an empty timeline shows EmptyState
+    // rather than query examples (those are reserved for custom queries).
+    const { getByText, queryByText } = render(
+      <ReviewRoom {...minimalProps({ timelineGroups: [] })} />,
+    )
+    expect(getByText('微光待启')).toBeTruthy()
+    expect(queryByText('没有匹配的微光，试试这些查询：')).toBeNull()
+  })
+
   test('renders timeline groups with gleam cards', () => {
     const groups: TimelineGroup[] = [
       {
@@ -63,6 +90,15 @@ describe('ReviewRoom', () => {
     expect(getByText('Second insight.')).toBeTruthy()
   })
 
+  test('calls onSearch with the default range query on mount', async () => {
+    const onSearch = vi.fn()
+    render(<ReviewRoom {...minimalProps({ onSearch })} />)
+    // Default range is 近三天 → a >=YYYYMMDD query is applied on mount.
+    await waitFor(() => expect(onSearch).toHaveBeenCalled())
+    const firstArg = onSearch.mock.calls[0][0] as string
+    expect(firstArg.startsWith('>=')).toBe(true)
+  })
+
   test('calls onSearch when the search input changes', async () => {
     const onSearch = vi.fn()
     const { getByPlaceholderText } = render(<ReviewRoom {...minimalProps({ onSearch })} />)
@@ -76,6 +112,29 @@ describe('ReviewRoom', () => {
     )
     // The internal useEffect calls onSearch after each state change.
     await waitFor(() => expect(onSearch).toHaveBeenCalledWith('react'))
+  })
+
+  test('switching the range dropdown fills the search box with a time query', async () => {
+    const onSearch = vi.fn()
+    const { getByTitle } = render(<ReviewRoom {...minimalProps({ onSearch })} />)
+    fireEvent.change(getByTitle('按时间范围筛选'), { target: { value: '本周' } })
+    await waitFor(() => expect(onSearch).toHaveBeenCalledWith('>=this-week'))
+  })
+
+  test('manual input switches the range dropdown to 自定义', async () => {
+    const onSearch = vi.fn()
+    const { getByPlaceholderText, getByTitle } = render(
+      <ReviewRoom {...minimalProps({ onSearch })} />,
+    )
+    fireEvent.input(
+      getByPlaceholderText(
+        '搜索：关键字 / tag:react / domain:github.com / type:book / after:2026-01-01 ...',
+      ),
+      { target: { value: 'react' } },
+    )
+    await waitFor(() =>
+      expect((getByTitle('按时间范围筛选') as HTMLSelectElement).value).toBe('自定义'),
+    )
   })
 
   test('calls onAddGleam when the add button is clicked', () => {
@@ -122,44 +181,21 @@ describe('ReviewRoom', () => {
         excerpt: 'Context quote.',
       },
     })
-    const { getByText, getByTitle } = render(
-      <ReviewRoom {...minimalProps({ viewingGleam: gleam })} />,
-    )
+    const { getByText } = render(<ReviewRoom {...minimalProps({ viewingGleam: gleam })} />)
     // Thought is rendered via MarkdownPreview in the detail card.
     expect(getByText('Deep thought.')).toBeTruthy()
-    // Back button.
-    expect(getByTitle('返回列表')).toBeTruthy()
-    // Source link shows the title text.
+    // Source link is still shown in the detail view (only the card hides it).
     expect(getByText('Source Page')).toBeTruthy()
-  })
-
-  test('calls onCloseDetail when the back button in the detail view is clicked', () => {
-    const gleam = makeGleam({ thought: 'Detail.' })
-    const onCloseDetail = vi.fn()
-    const { getByTitle } = render(
-      <ReviewRoom {...minimalProps({ viewingGleam: gleam, onCloseDetail })} />,
-    )
-    fireEvent.click(getByTitle('返回列表'))
-    expect(onCloseDetail).toHaveBeenCalledTimes(1)
-  })
-
-  test('calls onCloseDetail when the detail close button is clicked', () => {
-    const gleam = makeGleam({ thought: 'Backdrop test.' })
-    const onCloseDetail = vi.fn()
-    const { getByTitle } = render(
-      <ReviewRoom {...minimalProps({ viewingGleam: gleam, onCloseDetail })} />,
-    )
-    // The detail now renders inline in the right column; the close button
-    // (titled "关闭详情") calls onCloseDetail.
-    fireEvent.click(getByTitle('关闭详情'))
-    expect(onCloseDetail).toHaveBeenCalledTimes(1)
   })
 
   test('renders the tag editor with existing tags when a gleam is selected', () => {
     const gleam = makeGleam({ thought: 'Tagged.', tags: ['react', 'hooks'] })
-    const { getByText } = render(<ReviewRoom {...minimalProps({ viewingGleam: gleam })} />)
-    expect(getByText('react')).toBeTruthy()
-    expect(getByText('hooks')).toBeTruthy()
+    const groups: TimelineGroup[] = [{ dateLabel: 'Today', gleams: [gleam] }]
+    const { getAllByText } = render(
+      <ReviewRoom {...minimalProps({ viewingGleam: gleam, timelineGroups: groups })} />,
+    )
+    expect(getAllByText('react').length).toBeGreaterThan(0)
+    expect(getAllByText('hooks').length).toBeGreaterThan(0)
   })
 
   test('calls onAddTag when a new tag is typed and submitted', async () => {
@@ -176,11 +212,16 @@ describe('ReviewRoom', () => {
 
   test('calls onRemoveTag when a header tag chip is clicked', () => {
     const gleam = makeGleam({ thought: 'Tagged.', tags: ['react', 'hooks'] })
+    const groups: TimelineGroup[] = [{ dateLabel: 'Today', gleams: [gleam] }]
     const onRemoveTag = vi.fn().mockResolvedValue(undefined)
-    const { getByText } = render(
-      <ReviewRoom {...minimalProps({ viewingGleam: gleam, onRemoveTag })} />,
+    const { getAllByText } = render(
+      <ReviewRoom
+        {...minimalProps({ viewingGleam: gleam, timelineGroups: groups, onRemoveTag })}
+      />,
     )
-    fireEvent.click(getByText('react'))
+    // The detail header chip is the one wired to onRemoveTag; click it.
+    const chips = getAllByText('react')
+    fireEvent.click(chips[chips.length - 1])
     expect(onRemoveTag).toHaveBeenCalledWith('gleam-001', 'react')
   })
 

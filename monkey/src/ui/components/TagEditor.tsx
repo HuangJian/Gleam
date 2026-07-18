@@ -20,7 +20,7 @@ export function TagEditor({ tags, tagCounts, onAdd }: TagEditorProps) {
         !tags.includes(tc.tag) && (draftLower === '' || tc.tag.toLowerCase().includes(draftLower)),
     )
     .slice(0, 8)
-  const hotTags = tagCounts.slice(0, 8)
+  const hotTags = tagCounts.filter((tc) => !tags.includes(tc.tag)).slice(0, 8)
 
   const commitAdd = () => {
     const value = draft.trim()
@@ -32,17 +32,19 @@ export function TagEditor({ tags, tagCounts, onAdd }: TagEditorProps) {
   return (
     <Wrapper>
       <TagRow>
-        <HotHint>热门标签 -</HotHint>
-        {hotTags.map((tc) => (
-          <HotChip
-            key={tc.tag}
-            onClick={() => onAdd(tc.tag)}
-            title={`${tc.tag} · 用于 ${tc.count} 条拾光`}
-          >
-            {tc.tag}
-            <HotCount>{tc.count}</HotCount>
-          </HotChip>
-        ))}
+        <HotContainer>
+          <HotHint>热门标签 -</HotHint>
+          {hotTags.map((tc) => (
+            <HotChip
+              key={tc.tag}
+              onClick={() => onAdd(tc.tag)}
+              title={`${tc.tag} · 用于 ${tc.count} 条拾光`}
+            >
+              {tc.tag}
+              <HotCount>{tc.count}</HotCount>
+            </HotChip>
+          ))}
+        </HotContainer>
 
         <AddInput
           value={draft}
@@ -101,7 +103,18 @@ const TagRow = styled.div`
   flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
+`
+
+const HotContainer = styled.div`
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
+  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
 `
 
 const Suggestions = styled.div`
@@ -155,7 +168,7 @@ const HotCount = styled.span`
 `
 
 const AddInput = styled.input`
-  flex: 1 1 90px;
+  flex: 1 1 auto;
   min-width: 80px;
   background: ${theme.colors.bg.input};
   border: 1px solid ${theme.colors.border.light};

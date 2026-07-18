@@ -226,7 +226,6 @@ export function App({ repository, syncService, shadowHost }: AppProps) {
         onAddGleam={handleAddGleam}
         viewingGleam={viewingGleam}
         onOpenGleam={handleViewGleam}
-        onCloseDetail={() => setViewingGleam(null)}
         tagCounts={tagCounts}
         onAddTag={handleAddTag}
         onRemoveTag={handleRemoveTag}

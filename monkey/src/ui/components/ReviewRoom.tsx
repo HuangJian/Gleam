@@ -3,7 +3,7 @@ import styled from '@emotion/styled'
 import { Gleam } from '../../domain/gleam'
 import { TimelineGroup } from '../../services/timeline'
 import { GleamCard } from './GleamCard'
-import { SearchBar } from './SearchBar'
+import { SearchBar, EXAMPLE_QUERIES } from './SearchBar'
 import { MarkdownPreview } from './MarkdownPreview'
 import { MediaPreview } from './MediaPreview'
 import { SourceExcerpt } from './SourceExcerpt'
@@ -13,6 +13,38 @@ import type { SyncState } from '../../services/sync'
 import { theme } from '../theme'
 import { METEOR_ICON_URL } from '../assets'
 import { formatReviewTime, getSourceHost } from '../../utils/review'
+
+const RANGE_OPTIONS = ['自定义', '今天', '本周', '近三天', '近十天', '近三十天'] as const
+type RangeOption = (typeof RANGE_OPTIONS)[number]
+
+/** 计算 n 天前的本地日期，格式 YYYYMMDD（查询语言日期字面量）。 */
+function dateNDaysAgo(n: number): string {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - n)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}${m}${day}`
+}
+
+/** 将时间范围选项映射为 Recall 查询语句。 */
+function rangeToQuery(range: string): string {
+  switch (range) {
+    case '今天':
+      return '>=today'
+    case '本周':
+      return '>=this-week'
+    case '近三天':
+      return `>=${dateNDaysAgo(3)}`
+    case '近十天':
+      return `>=${dateNDaysAgo(10)}`
+    case '近三十天':
+      return `>=${dateNDaysAgo(30)}`
+    default:
+      return '' // 自定义：不强制任何时间范围
+  }
+}
 
 interface ReviewRoomProps {
   isOpen: boolean
@@ -24,7 +56,6 @@ interface ReviewRoomProps {
   onAddGleam: () => void
   viewingGleam: Gleam | null
   onOpenGleam: (gleam: Gleam) => void
-  onCloseDetail: () => void
   tagCounts: TagCount[]
   onAddTag: (gleamId: string, tag: string) => Promise<void>
   onRemoveTag: (gleamId: string, tag: string) => Promise<void>
@@ -43,7 +74,6 @@ export function ReviewRoom({
   onAddGleam,
   viewingGleam,
   onOpenGleam,
-  onCloseDetail,
   tagCounts,
   onAddTag,
   onRemoveTag,
@@ -51,11 +81,29 @@ export function ReviewRoom({
   highlights,
   onOpenSettings,
 }: ReviewRoomProps) {
-  const [searchQuery, setSearchQuery] = useState('')
+  const [range, setRange] = useState<RangeOption>('近三天')
+  const [searchQuery, setSearchQuery] = useState(() => rangeToQuery('近三天'))
+
+  // A custom query (typed by the user) that matched nothing → show examples.
+  // Preset ranges that match nothing still show the generic empty state.
+  const showQueryExamples =
+    range === '自定义' && searchQuery.trim() !== '' && timelineGroups.length === 0
 
   useEffect(() => {
     onSearch(searchQuery)
   }, [searchQuery])
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    // 用户手动输入 → 视为自定义范围，不再套用预设时间筛选
+    setRange('自定义')
+  }
+
+  const handleRangeChange = (value: string) => {
+    setRange(value as RangeOption)
+    // 自定义：保留用户当前输入；其余选项填入对应时间查询
+    setSearchQuery(value === '自定义' ? '' : rangeToQuery(value))
+  }
 
   useEffect(() => {
     if (!isOpen) return
@@ -80,19 +128,33 @@ export function ReviewRoom({
   return (
     <Overlay data-testid="review-room">
       <Layout>
-        <ListColumn>
-          <Header>
-            <HeaderTitle>
-              <GleamIcon src={METEOR_ICON_URL} alt="" />
-              <span>拾光 · 认知演化的轨迹</span>
-            </HeaderTitle>
+        <Header>
+          <HeaderTitle>
+            <GleamIcon src={METEOR_ICON_URL} alt="" />
+            <span>拾光 · 认知演化的轨迹</span>
+            <SyncIndicator onClick={onOpenSettings} title="同步状态与设置">
+              <SyncDot $status={syncState.status} />
+              {syncState.pendingCount > 0 && <PendingBadge>{syncState.pendingCount}</PendingBadge>}
+            </SyncIndicator>
+          </HeaderTitle>
+          <HeaderMiddle>
+            <RangeSelect
+              value={range}
+              onChange={(e: Event) => handleRangeChange((e.target as HTMLSelectElement).value)}
+              title="按时间范围筛选"
+            >
+              {RANGE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </RangeSelect>
+            <SearchWrapper>
+              <SearchBar value={searchQuery} onChange={handleSearchChange} />
+            </SearchWrapper>
+          </HeaderMiddle>
+          <HeaderRight>
             <HeaderActions>
-              <SyncIndicator onClick={onOpenSettings} title="同步状态与设置">
-                <SyncDot $status={syncState.status} />
-                {syncState.pendingCount > 0 && (
-                  <PendingBadge>{syncState.pendingCount}</PendingBadge>
-                )}
-              </SyncIndicator>
               <AddButton onClick={onAddGleam} title="添加拾光 (无来源)">
                 <svg viewBox="0 0 24 24">
                   <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
@@ -107,132 +169,142 @@ export function ReviewRoom({
                 &times;
               </CloseButton>
             </HeaderActions>
-          </Header>
+          </HeaderRight>
+        </Header>
 
-          <SearchWrapper>
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
-              hasResults={timelineGroups.length > 0}
-            />
-          </SearchWrapper>
-
-          <ScrollableContent>
-            {timelineGroups.length === 0 ? (
-              <EmptyState>
-                <EmptyIcon src={METEOR_ICON_URL} alt="" />
-                <EmptyText>微光待启</EmptyText>
-                <EmptySubtext>
-                  划选页面文字，或按 <kbd>Ctrl+Shift+G</kbd> 记录你的第一个理解瞬间。
-                </EmptySubtext>
-              </EmptyState>
-            ) : (
-              <TimelineList>
-                {timelineGroups.map((group) => (
-                  <TimelineGroupSection key={group.dateLabel}>
-                    <GroupHeader>
-                      <GroupLine />
-                      <GroupDateLabel>{group.dateLabel}</GroupDateLabel>
-                      <GroupLine />
-                    </GroupHeader>
-                    <GleamList>
-                      {group.gleams.map((gleam) => (
-                        <GleamCard
-                          key={gleam.id}
-                          gleam={gleam}
-                          selected={viewingGleam?.id === gleam.id}
-                          tagCounts={tagCounts}
-                          onRevisit={onRevisitGleam}
-                          onClick={handleCardClick}
-                          highlight={highlights[gleam.id] ?? null}
-                        />
+        <Body>
+          <ListColumn>
+            <ScrollableContent>
+              {timelineGroups.length === 0 ? (
+                showQueryExamples ? (
+                  <QueryExamples>
+                    <ExamplesHint>没有匹配的微光，试试这些查询：</ExamplesHint>
+                    <ExamplesList>
+                      {EXAMPLE_QUERIES.map((ex) => (
+                        <ExampleItem
+                          key={ex.query}
+                          type="button"
+                          onClick={() => setSearchQuery(ex.query)}
+                          title={`填入查询：${ex.query}`}
+                        >
+                          <ExampleQuery>{ex.query}</ExampleQuery>
+                          <ExampleLabel>
+                            {'    '}
+                            {ex.label}
+                          </ExampleLabel>
+                        </ExampleItem>
                       ))}
-                    </GleamList>
-                  </TimelineGroupSection>
-                ))}
-              </TimelineList>
-            )}
-          </ScrollableContent>
-        </ListColumn>
-
-        <DetailColumn>
-          {viewingGleam ? (
-            <>
-              <DetailHeader>
-                <BackButton onClick={onCloseDetail} title="返回列表">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M20,11V13H8L13.5,18.5L12,20L4,12L12,4L13.5,5.5L8,11H20Z" />
-                  </svg>
-                </BackButton>
-                <HeaderTags>
-                  {sortedTags.map((tag) => (
-                    <HeaderTagChip
-                      key={tag}
-                      onClick={() => onRemoveTag(viewingGleam.id, tag)}
-                      title={`${tag} · 用于 ${countMap.get(tag) ?? 0} 条拾光 · 点击移除`}
-                    >
-                      {tag}
-                      <HeaderTagRemove aria-hidden>&times;</HeaderTagRemove>
-                    </HeaderTagChip>
+                    </ExamplesList>
+                  </QueryExamples>
+                ) : (
+                  <EmptyState>
+                    <EmptyIcon src={METEOR_ICON_URL} alt="" />
+                    <EmptyText>微光待启</EmptyText>
+                    <EmptySubtext>
+                      划选页面文字，或按 <kbd>Ctrl+Shift+G</kbd> 记录你的第一个理解瞬间。
+                    </EmptySubtext>
+                  </EmptyState>
+                )
+              ) : (
+                <TimelineList>
+                  {timelineGroups.map((group) => (
+                    <TimelineGroupSection key={group.dateLabel}>
+                      <GroupHeader>
+                        <GroupLine />
+                        <GroupDateLabel>{group.dateLabel}</GroupDateLabel>
+                        <GroupLine />
+                      </GroupHeader>
+                      <GleamList>
+                        {group.gleams.map((gleam) => (
+                          <GleamCard
+                            key={gleam.id}
+                            gleam={gleam}
+                            selected={viewingGleam?.id === gleam.id}
+                            tagCounts={tagCounts}
+                            onRevisit={onRevisitGleam}
+                            onClick={handleCardClick}
+                            highlight={highlights[gleam.id] ?? null}
+                          />
+                        ))}
+                      </GleamList>
+                    </TimelineGroupSection>
                   ))}
-                </HeaderTags>
-                <DetailTime>{formatReviewTime(viewingGleam.createdAt)}</DetailTime>
-                <DetailActions>
-                  {viewingGleam.revisitCount > 0 ? (
-                    <RevisitBadge title={`回顾次数: ${viewingGleam.revisitCount}`}>
-                      👁 {viewingGleam.revisitCount}
-                    </RevisitBadge>
-                  ) : null}
-                  <DetailCloseButton onClick={onCloseDetail} title="关闭详情">
-                    &times;
-                  </DetailCloseButton>
-                </DetailActions>
-              </DetailHeader>
+                </TimelineList>
+              )}
+            </ScrollableContent>
+          </ListColumn>
 
-              <DetailContent>
-                <ThoughtText>
-                  <MarkdownPreview content={viewingGleam.thought} />
-                </ThoughtText>
+          <DetailColumn>
+            {viewingGleam ? (
+              <>
+                <DetailHeader>
+                  <HeaderTags>
+                    {sortedTags.map((tag) => (
+                      <HeaderTagChip
+                        key={tag}
+                        onClick={() => onRemoveTag(viewingGleam.id, tag)}
+                        title={`${tag} · 用于 ${countMap.get(tag) ?? 0} 条拾光 · 点击移除`}
+                      >
+                        {tag}
+                        <HeaderTagRemove aria-hidden>&times;</HeaderTagRemove>
+                      </HeaderTagChip>
+                    ))}
+                  </HeaderTags>
+                  <DetailTime>{formatReviewTime(viewingGleam.createdAt)}</DetailTime>
+                  <DetailActions>
+                    {viewingGleam.revisitCount > 0 ? (
+                      <RevisitBadge title={`回顾次数: ${viewingGleam.revisitCount}`}>
+                        👁 {viewingGleam.revisitCount}
+                      </RevisitBadge>
+                    ) : null}
+                  </DetailActions>
+                </DetailHeader>
 
-                {viewingGleam.source.excerpt && (
-                  <SourceExcerpt text={viewingGleam.source.excerpt} />
-                )}
+                <DetailContent>
+                  <ThoughtText>
+                    <MarkdownPreview content={viewingGleam.thought} />
+                  </ThoughtText>
 
-                {viewingGleam.source.media && <MediaPreview media={viewingGleam.source.media} />}
+                  {viewingGleam.source.excerpt && (
+                    <SourceExcerpt text={viewingGleam.source.excerpt} />
+                  )}
 
-                {viewingGleam.source.url && (
-                  <SourceFooter>
-                    <SourceIcon viewBox="0 0 24 24">
-                      <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z" />
-                    </SourceIcon>
-                    <LinkAnchor
-                      href={viewingGleam.source.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={viewingGleam.source.url}
-                    >
-                      {viewingGleam.source.title ||
-                        getSourceHost(viewingGleam.source.url) ||
-                        '原始页面'}
-                    </LinkAnchor>
-                    <SourceHost>{getSourceHost(viewingGleam.source.url)}</SourceHost>
-                  </SourceFooter>
-                )}
+                  {viewingGleam.source.media && <MediaPreview media={viewingGleam.source.media} />}
 
-                <TagEditor
-                  tags={viewingGleam.tags}
-                  tagCounts={tagCounts}
-                  onAdd={(tag) => onAddTag(viewingGleam.id, tag)}
-                />
-              </DetailContent>
-            </>
-          ) : (
-            <DetailPlaceholder>
-              <PlaceholderIcon src={METEOR_ICON_URL} alt="" />
-              <PlaceholderText>选择微光，细细品味</PlaceholderText>
-            </DetailPlaceholder>
-          )}
-        </DetailColumn>
+                  {viewingGleam.source.url && (
+                    <SourceFooter>
+                      <SourceIcon viewBox="0 0 24 24">
+                        <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z" />
+                      </SourceIcon>
+                      <LinkAnchor
+                        href={viewingGleam.source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={viewingGleam.source.url}
+                      >
+                        {viewingGleam.source.title ||
+                          getSourceHost(viewingGleam.source.url) ||
+                          '原始页面'}
+                      </LinkAnchor>
+                      <SourceHost>{getSourceHost(viewingGleam.source.url)}</SourceHost>
+                    </SourceFooter>
+                  )}
+
+                  <TagEditor
+                    tags={viewingGleam.tags}
+                    tagCounts={tagCounts}
+                    onAdd={(tag) => onAddTag(viewingGleam.id, tag)}
+                  />
+                </DetailContent>
+              </>
+            ) : (
+              <DetailPlaceholder>
+                <PlaceholderIcon src={METEOR_ICON_URL} alt="" />
+                <PlaceholderText>选择微光，细细品味</PlaceholderText>
+              </DetailPlaceholder>
+            )}
+          </DetailColumn>
+        </Body>
       </Layout>
     </Overlay>
   )
@@ -266,6 +338,7 @@ const Overlay = styled.div`
 
 const Layout = styled.div`
   display: flex;
+  flex-direction: column;
   width: 100vw;
   height: 100vh;
   background: ${theme.colors.bg.base};
@@ -283,9 +356,9 @@ const Layout = styled.div`
 `
 
 const ListColumn = styled.div`
-  width: 360px;
+  width: 540px;
   flex-shrink: 0;
-  height: 100vh;
+  height: 100%;
   background: ${theme.colors.bg.base};
   border-right: 1px solid ${theme.colors.border.light};
   box-shadow: ${theme.shadows.card};
@@ -296,7 +369,7 @@ const ListColumn = styled.div`
 
 const DetailColumn = styled.div`
   flex: 1;
-  height: 100vh;
+  height: 100%;
   background: ${theme.colors.bg.input};
   display: flex;
   flex-direction: column;
@@ -307,19 +380,61 @@ const Header = styled.header`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
+  padding: 12px 16px;
   border-bottom: 1px solid ${theme.colors.border.light};
   flex-shrink: 0;
+`
+
+const HeaderMiddle = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  margin: 0 12px;
+`
+
+const HeaderRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+`
+
+const Body = styled.div`
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+`
+
+const RangeSelect = styled.select`
+  flex-shrink: 0;
+  background: ${theme.colors.bg.input};
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: ${theme.colors.text.secondary};
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: ${theme.animations.transition};
+
+  &:focus {
+    border-color: ${theme.colors.border.focus};
+    box-shadow: 0 0 10px ${theme.colors.brand.glow};
+  }
 `
 
 const HeaderTitle = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: ${theme.colors.text.primary};
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 `
 
 const GleamIcon = styled.img`
@@ -445,19 +560,19 @@ const CloseButton = styled.button`
 `
 
 const SearchWrapper = styled.div`
-  padding: 14px 24px;
-  border-bottom: 1px solid rgba(200, 180, 140, 0.15);
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-width: 240px;
+  max-width: 720px;
 `
 
 const ScrollableContent = styled.div`
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 24px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 `
 
 const EmptyState = styled.div`
@@ -466,15 +581,15 @@ const EmptyState = styled.div`
   align-items: center;
   justify-content: center;
   text-align: center;
-  height: 60%;
-  padding: 20px;
+  height: 50%;
+  padding: 16px;
 `
 
 const EmptyIcon = styled.img`
   width: 40px;
   height: 40px;
   opacity: 0.25;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 `
 
 const EmptyText = styled.h3`
@@ -488,7 +603,7 @@ const EmptySubtext = styled.p`
   margin: 0;
   font-size: 12.5px;
   color: ${theme.colors.text.muted};
-  line-height: 1.6;
+  line-height: 1.5;
 
   kbd {
     background: rgba(200, 180, 140, 0.15);
@@ -500,22 +615,76 @@ const EmptySubtext = styled.p`
   }
 `
 
+const QueryExamples = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 2px;
+`
+
+const ExamplesHint = styled.div`
+  font-size: 12px;
+  color: ${theme.colors.text.muted};
+`
+
+const ExamplesList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+`
+
+const ExampleItem = styled.button`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 6px;
+  cursor: pointer;
+  transition: ${theme.animations.transition};
+
+  &:hover {
+    background: ${theme.colors.reference.bg};
+  }
+`
+
+const ExampleQuery = styled.code`
+  flex-shrink: 0;
+  font-family: ${theme.typography.fontFamily};
+  font-size: 12px;
+  color: ${theme.colors.brand.primary};
+  background: ${theme.colors.reference.bg};
+  border: 1px solid ${theme.colors.reference.border};
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+`
+
+const ExampleLabel = styled.span`
+  font-size: 12px;
+  color: ${theme.colors.text.secondary};
+  padding-left: 4px;
+  white-space: pre;
+`
+
 const TimelineList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 `
 
 const TimelineGroupSection = styled.section`
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 `
 
 const GroupHeader = styled.div`
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 `
 
 const GroupLine = styled.div`
@@ -535,7 +704,7 @@ const GroupDateLabel = styled.span`
 const GleamList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 `
 
 const DetailPlaceholder = styled.div`
@@ -545,8 +714,8 @@ const DetailPlaceholder = styled.div`
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 16px;
-  padding: 24px;
+  gap: 12px;
+  padding: 16px;
   color: ${theme.colors.text.muted};
 `
 
@@ -560,53 +729,16 @@ const PlaceholderText = styled.p`
   margin: 0;
   font-size: 14px;
   color: ${theme.colors.text.muted};
-  line-height: 1.6;
-`
-
-const DetailCloseButton = styled.button`
-  background: none;
-  border: none;
-  color: ${theme.colors.text.muted};
-  font-size: 24px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  transition: ${theme.animations.transition};
-
-  &:hover {
-    color: ${theme.colors.text.primary};
-  }
+  line-height: 1.5;
 `
 
 const DetailHeader = styled.header`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 8px 12px;
   border-bottom: 1px solid ${theme.colors.border.light};
   flex-shrink: 0;
-`
-
-const BackButton = styled.button`
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: ${theme.animations.transition};
-
-  svg {
-    width: 20px;
-    height: 20px;
-    fill: ${theme.colors.text.muted};
-  }
-
-  &:hover svg {
-    fill: ${theme.colors.text.primary};
-  }
 `
 
 const DetailTime = styled.span`
@@ -619,12 +751,12 @@ const DetailTime = styled.span`
 const HeaderTags = styled.div`
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
   min-width: 0;
   overflow: hidden;
   flex-wrap: nowrap;
-  padding: 0 12px;
+  padding: 0 8px;
 `
 
 const HeaderTagChip = styled.span`
@@ -657,7 +789,7 @@ const HeaderTagRemove = styled.span`
 const DetailActions = styled.div`
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
 `
 
@@ -671,27 +803,27 @@ const RevisitBadge = styled.span`
 
 const DetailContent = styled.div`
   flex: 1;
-  padding: 24px;
+  padding: 16px;
   overflow-y: auto;
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 `
 
 const ThoughtText = styled.div`
   font-size: 15px;
-  line-height: 1.7;
+  line-height: 1.6;
   color: ${theme.colors.text.primary};
 `
 
 const SourceFooter = styled.div`
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   border-top: 1px solid rgba(200, 180, 140, 0.15);
-  padding-top: 12px;
-  margin-top: 4px;
+  padding-top: 8px;
+  margin-top: 2px;
 `
 
 const SourceIcon = styled.svg`

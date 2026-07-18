@@ -2,5 +2,5 @@
   "semi": false,
   "singleQuote": true,
   "trailingComma": "all",
-  "ignorePatterns": ["doc/manifest/**", "doc/MANIFEST.md", "bun.lock"]
+  "ignorePatterns": ["doc/manifest/**", "doc/MANIFEST.md", "bun.lock", "*.plan.md"]
 }

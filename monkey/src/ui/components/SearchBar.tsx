@@ -4,14 +4,11 @@ import { theme } from '../theme'
 interface SearchBarProps {
   value: string
   onChange: (value: string) => void
-  /** Whether the current query matched at least one gleam. When false and the
-   *  query is non-empty, we show clickable example queries. */
-  hasResults?: boolean
 }
 
 /** Curated example queries shown when a search yields nothing. Keep in sync
  *  with doc/query-language.md and the grammar in monkey/src/services/query.ts. */
-const EXAMPLE_QUERIES: { query: string; label: string }[] = [
+export const EXAMPLE_QUERIES: { query: string; label: string }[] = [
   { query: 'react', label: '查找任何包含「react」的微光' },
   { query: '#family', label: '标签为 family 的微光' },
   { query: 'domain:github.com', label: '来源来自 github.com 的微光' },
@@ -24,9 +21,7 @@ const EXAMPLE_QUERIES: { query: string; label: string }[] = [
   { query: '~2026Q3', label: '2026 年第三季度的微光' },
 ]
 
-export function SearchBar({ value, onChange, hasResults = true }: SearchBarProps) {
-  const showExamples = value.trim() !== '' && !hasResults
-
+export function SearchBar({ value, onChange }: SearchBarProps) {
   return (
     <SearchContainer>
       <SearchIcon viewBox="0 0 24 24">
@@ -44,28 +39,6 @@ export function SearchBar({ value, onChange, hasResults = true }: SearchBarProps
         <ClearButton onClick={() => onChange('')} title="清除搜索">
           &times;
         </ClearButton>
-      )}
-
-      {showExamples && (
-        <ExamplesPanel>
-          <ExamplesHint>没有匹配的微光，试试这些查询：</ExamplesHint>
-          <ExamplesList>
-            {EXAMPLE_QUERIES.map((ex) => (
-              <ExampleItem
-                key={ex.query}
-                type="button"
-                onClick={() => onChange(ex.query)}
-                title={`填入查询：${ex.query}`}
-              >
-                <ExampleQuery>{ex.query}</ExampleQuery>
-                <ExampleLabel>
-                  {'    '}
-                  {ex.label}
-                </ExampleLabel>
-              </ExampleItem>
-            ))}
-          </ExamplesList>
-        </ExamplesPanel>
       )}
     </SearchContainer>
   )
@@ -125,67 +98,4 @@ const ClearButton = styled.button`
   &:hover {
     color: ${theme.colors.text.primary};
   }
-`
-
-const ExamplesPanel = styled.div`
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  z-index: 20;
-  background: ${theme.colors.bg.card};
-  border: 1px solid ${theme.colors.border.light};
-  border-radius: 10px;
-  box-shadow: ${theme.shadows.popover};
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`
-
-const ExamplesHint = styled.div`
-  font-size: 12px;
-  color: ${theme.colors.text.muted};
-`
-
-const ExamplesList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`
-
-const ExampleItem = styled.button`
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: left;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 8px;
-  cursor: pointer;
-  transition: ${theme.animations.transition};
-
-  &:hover {
-    background: ${theme.colors.reference.bg};
-  }
-`
-
-const ExampleQuery = styled.code`
-  flex-shrink: 0;
-  font-family: ${theme.typography.fontFamily};
-  font-size: 12px;
-  color: ${theme.colors.brand.primary};
-  background: ${theme.colors.reference.bg};
-  border: 1px solid ${theme.colors.reference.border};
-  border-radius: 4px;
-  padding: 1px 6px;
-  white-space: nowrap;
-`
-
-const ExampleLabel = styled.span`
-  font-size: 12px;
-  color: ${theme.colors.text.secondary};
-  padding-left: 4px;
-  white-space: pre;
 `

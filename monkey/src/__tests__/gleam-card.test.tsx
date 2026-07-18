@@ -13,31 +13,24 @@ describe('GleamCard', () => {
     expect(getByText('Pattern matching is powerful.')).toBeTruthy()
   })
 
-  test('shows the excerpt when present', () => {
+  test('does not render a source excerpt block', () => {
     const gleam = makeGleam({
       thought: 'Good quote.',
       source: { type: 'url', url: 'https://x.com', title: '', excerpt: 'To be or not to be' },
     })
-    const { getByText } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
-    expect(getByText(/To be or not to be/)).toBeTruthy()
-  })
-
-  test('does not render an excerpt block when absent', () => {
-    const gleam = makeGleam({ thought: 'Plain thought.' })
     const { container } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
-    // The source reference (来源引用) is only shown when an excerpt exists.
+    // Source excerpt is intentionally hidden on the card (shown only in detail).
     expect(container.querySelector('figure')).toBeNull()
+    expect(container.textContent).not.toContain('To be or not to be')
   })
 
-  test('shows the source link when a URL is present', () => {
+  test('does not render a source link when a URL is present', () => {
     const gleam = makeGleam({
       thought: 'From an article.',
       source: { type: 'url', url: 'https://example.com/post', title: 'My Post', excerpt: '' },
     })
-    const { getByText } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
-    const link = getByText('My Post')
-    expect(link.tagName).toBe('A')
-    expect(link.getAttribute('href')).toBe('https://example.com/post')
+    const { queryByText } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
+    expect(queryByText('My Post')).toBeNull()
   })
 
   test('shows a revisit badge when revisitCount > 0', () => {

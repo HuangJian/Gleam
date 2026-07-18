@@ -3,10 +3,8 @@ import { Gleam } from '../../domain/gleam'
 import { theme } from '../theme'
 import { MarkdownPreview } from './MarkdownPreview'
 import { MediaPreview } from './MediaPreview'
-import { SourceExcerpt } from './SourceExcerpt'
 import { HighlightText } from './HighlightText'
 import { TagCount } from '../../services/tag'
-import { getSourceHost } from '../../utils/review'
 
 interface GleamCardProps {
   gleam: Gleam
@@ -72,27 +70,7 @@ export function GleamCard({
         )}
       </ThoughtText>
 
-      {gleam.source.excerpt && <SourceExcerpt text={gleam.source.excerpt} compact />}
-
       {gleam.source.media && <MediaPreview media={gleam.source.media} compact />}
-
-      {gleam.source.url && (
-        <SourceFooter>
-          <SourceIcon viewBox="0 0 24 24">
-            <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z" />
-          </SourceIcon>
-          <LinkAnchor
-            href={gleam.source.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e: MouseEvent) => e.stopPropagation()}
-            title={gleam.source.url}
-          >
-            {gleam.source.title || getSourceHost(gleam.source.url) || '原始页面'}
-          </LinkAnchor>
-          <SourceHost>{getSourceHost(gleam.source.url)}</SourceHost>
-        </SourceFooter>
-      )}
     </Card>
   )
 }
@@ -196,47 +174,4 @@ const ThoughtText = styled.div`
   max-height: 4.8em;
   overflow-y: auto;
   overscroll-behavior: contain;
-`
-
-const SourceFooter = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border-top: 1px solid rgba(200, 180, 140, 0.15);
-  padding-top: 10px;
-  margin-top: 4px;
-`
-
-const SourceIcon = styled.svg`
-  width: 12px;
-  height: 12px;
-  fill: ${theme.colors.text.muted};
-  flex-shrink: 0;
-`
-
-const LinkAnchor = styled.a`
-  font-size: 12px;
-  color: ${theme.colors.text.secondary};
-  text-decoration: none;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 160px;
-  transition: ${theme.animations.transition};
-
-  &:hover {
-    color: ${theme.colors.text.accent};
-    text-decoration: underline;
-  }
-`
-
-const SourceHost = styled.span`
-  font-size: 10px;
-  color: ${theme.colors.text.muted};
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  text-align: right;
 `

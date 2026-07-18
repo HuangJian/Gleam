@@ -40,28 +40,8 @@ describe('SearchBar', () => {
     expect(queryByTitle('清除搜索')).toBeNull()
   })
 
-  test('shows example queries when a non-empty query has no results', () => {
-    const onChange = vi.fn()
-    const { getByText, queryByText } = render(
-      <SearchBar value="zzz-nomatch" onChange={onChange} hasResults={false} />,
-    )
-    expect(getByText('没有匹配的微光，试试这些查询：')).toBeTruthy()
-    const example = getByText('#family') as HTMLElement
-    expect(example).toBeTruthy()
-    fireEvent.click(example)
-    expect(onChange).toHaveBeenCalledWith('#family')
-    expect(queryByText('标签为 family 的微光')).toBeTruthy()
-  })
-
-  test('does not show examples when there are results', () => {
-    const { queryByText } = render(
-      <SearchBar value="react" onChange={() => {}} hasResults={true} />,
-    )
-    expect(queryByText('没有匹配的微光，试试这些查询：')).toBeNull()
-  })
-
-  test('does not show examples for an empty query', () => {
-    const { queryByText } = render(<SearchBar value="" onChange={() => {}} hasResults={false} />)
+  test('does not render example queries inline (moved to the list column)', () => {
+    const { queryByText } = render(<SearchBar value="zzz-nomatch" onChange={() => {}} />)
     expect(queryByText('没有匹配的微光，试试这些查询：')).toBeNull()
   })
 })
