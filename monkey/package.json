@@ -7,10 +7,7 @@
     "dev": "vite",
     "build": "bun run typecheck && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit --incremental",
-    "lint": "oxlint . -c ../.oxlintrc.json",
-    "format": "oxfmt . --disable-nested-config -c ../.oxfmtrc.json",
-    "check": "bun run typecheck && bun run lint && bun run format && bun test && vite build"
+    "typecheck": "tsc --noEmit --incremental"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",

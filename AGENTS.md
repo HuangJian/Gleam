@@ -72,12 +72,12 @@ Match validation to risk.
 
 Scoped validation commands:
 
-| Command         | Use for                                                       |
-| --------------- | ------------------------------------------------------------- |
-| `bun test`      | Unit tests (Bun's built-in test runner)                       |
-| `bun run build` | Type errors (via `tsc`) + production build (via `vite build`) |
-| `bun run dev`   | Local dev server with HMR (for manual browser testing)        |
-| `bun run check` | Comprehensive: typecheck + lint + format + tests + build      |
+| Command         | Use for                                                                                            |
+| --------------- | -------------------------------------------------------------------------------------------------- |
+| `bun test`      | Unit tests (Bun's built-in test runner)                                                            |
+| `bun run build` | Type errors (via `tsc`) + production build (via `vite build`)                                      |
+| `bun run dev`   | Local dev server with HMR (for manual browser testing)                                             |
+| `bun run check` | Smart minimal: git-diff scoped, format → parallel typecheck/lint/test/build. `--full` to force all |
 
 ## Task Workflows
 
@@ -132,13 +132,22 @@ The repo is a Bun workspace with three packages: `shared` (`@gleam/shared`), `ba
 bun install                       # installs the whole workspace
 bun run --filter @gleam/monkey test
 bun run --filter @gleam/monkey typecheck
-bun run --filter @gleam/monkey lint
-bun run --filter @gleam/monkey format
 bun run --filter @gleam/monkey build
-bun run check                     # runs check in every package
+bun run check                     # smart minimal check (git-diff scoped, parallel)
+bun run format                    # format changed files (--full for all)
 ```
 
-`bun run check` (root) is the preferred final validation. Per-package scripts also exist (`bun run --filter @gleam/<pkg> <script>`).
+`bun run check` (root) runs `scripts/check.ts`, which:
+
+- Detects changed files via git; scopes lint/format to changed files, test/build to affected packages.
+- Phase 1: `format` (`--write`) runs alone to avoid read/write races.
+- Phase 2: `typecheck` + `lint` + `test` + `build` run in parallel.
+- Pass `--full` to skip diff detection and check everything.
+- Skips all checks when the working tree is clean (use `--full` to force).
+
+Lint/format config lives in `config/oxlintrc.json` and `config/oxfmtrc.json`, passed via `-c`. The project has no `.oxlintrc.json`/`.oxfmtrc.json` at the root — oxfmt's `ignorePatterns` is buggy (oxc#24276, oxc#22066), so `scripts/configs.ts` reads `config/oxfmtrc.json` and applies the patterns itself via `filterIgnoredFiles()`.
+
+Per-package `typecheck` uses `tsc --noEmit --incremental`. Per-package `lint`/`format`/`check` scripts have been removed — use `bun run check` or `bun run format` from the root.
 
 ### Architecture & Layout
 
@@ -167,11 +176,20 @@ monkey/                          @gleam/monkey — Tampermonkey UserScript clien
   src/__tests__/         Unit tests (bun:test).
   vite.config.ts         Userscript build config (vite-plugin-monkey).
   bunfig.toml            Test preload (src/__tests__/setup.ts).
-  .oxlintrc.json / .oxfmtrc.json
   dist/                  Generated .user.js output (do not hand-edit).
 backend/                         @gleam/backend — GraphQL server (graphql-yoga + drizzle + SQLite)
   src/ ...
 doc/                             Product manifest and chapter derivations.
+scripts/                         Check orchestration (run via `bun run check` / `bun run format`).
+  check.ts               Main orchestrator: git-diff scope → format → parallel typecheck/lint/test/build.
+  format.ts              Standalone format (`--write`) entry.
+  configs.ts             Builds `-c config/...` args for oxlint/oxfmt; `filterIgnoredFiles()` reads oxfmt config's ignorePatterns.
+  git.ts                 Changed-file detection + affected-package mapping.
+  runner.ts              spawn capture, result aggregation, print, sha256/size utils.
+  test-silent.ts         Runs `bun test` silently, re-prints failure details.
+config/                          Lint/format config (passed via `-c`, not auto-discovered).
+  oxlintrc.json          oxlint config (plugins, categories, env, rules).
+  oxfmtrc.json           oxfmt config (semi, singleQuote, trailingComma).
 ```
 
 Cross-package sharing goes through `@gleam/shared` only (e.g. `import type { Gleam } from '@gleam/shared/types'`). The client and backend both import the query language from `@gleam/shared/query`.
@@ -234,6 +252,7 @@ When adding new GM API usage, extend these files. Do not scatter `GM_*` calls ac
 - Source files live under `monkey/src/`. Generated output lives under `monkey/dist/`.
 - Do not hand-edit files in `monkey/dist/`; rebuild with `bun run --filter @gleam/monkey build`.
 - The `// ==UserScript==` metadata block is defined in `monkey/vite.config.ts` (`monkey()` plugin config), not in source files.
+- `scripts/check.ts` runs `vite build` directly (not `bun run --filter @gleam/monkey build`), avoiding a redundant typecheck.
 
 ### Testing Rules
 

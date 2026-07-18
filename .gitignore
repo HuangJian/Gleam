@@ -6,4 +6,4 @@ data/
 .vscode/
 dist-monkey/
 
-tsconfig.tsbuildinfo
+*.tsbuildinfo

@@ -7,15 +7,6 @@
   "env": {
     "node": true
   },
-  "ignorePatterns": [
-    "dist/**",
-    "node_modules/**",
-    "src/generated/**",
-    "data/**",
-    "bun.lock",
-    "doc/manifest/**",
-    "doc/MANIFEST.md"
-  ],
   "rules": {
     "oxc/no-async-endpoint-handlers": "off"
   }

@@ -11,9 +11,6 @@
     "./query": "./query.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "lint": "oxlint . -c ../.oxlintrc.json",
-    "format": "oxfmt . --disable-nested-config -c ../.oxfmtrc.json",
-    "check": "tsc --noEmit && bun run lint"
+    "typecheck": "tsc --noEmit --incremental"
   }
 }

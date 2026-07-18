@@ -2,22 +2,26 @@
   "name": "gleam",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "shared",
+    "backend",
+    "monkey"
+  ],
   "type": "module",
-  "workspaces": ["shared", "backend", "monkey"],
+  "scripts": {
+    "dev": "bun run --filter @gleam/monkey dev",
+    "build": "bun run --filter @gleam/monkey build",
+    "preview": "bun run --filter @gleam/monkey preview",
+    "typecheck": "bun run --filter '*' typecheck && bun run typecheck:tools",
+    "typecheck:tools": "tsc --noEmit --incremental -p tsconfig.json",
+    "test": "bun run --filter '*' test",
+    "format": "bun run scripts/format.ts",
+    "check": "bun run scripts/check.ts"
+  },
   "devDependencies": {
     "@types/bun": "^1.3.14",
     "oxfmt": "0.59.0",
     "oxlint": "1.74.0",
     "typescript": "^7.0.2"
-  },
-  "scripts": {
-    "dev": "bun run --filter @gleam/monkey dev",
-    "build": "bun run --filter @gleam/monkey build",
-    "preview": "bun run --filter @gleam/monkey preview",
-    "typecheck": "bun run --filter '*' typecheck",
-    "lint": "bun run --filter '*' lint",
-    "format": "bun run --filter '*' format",
-    "test": "bun run --filter '*' test",
-    "check": "bun run --filter '*' check"
   }
 }

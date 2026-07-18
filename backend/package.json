@@ -8,10 +8,7 @@
     "start": "bun run src/main.ts",
     "build": "tsc --noEmit",
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "lint": "oxlint . -c ../.oxlintrc.json",
-    "format": "oxfmt . --disable-nested-config -c ../.oxfmtrc.json",
-    "check": "bun run typecheck && bun run lint && bun test",
+    "typecheck": "tsc --noEmit --incremental",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/database/migrate.ts"
   },
