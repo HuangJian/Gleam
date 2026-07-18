@@ -110,8 +110,14 @@ export class GMStorageAdapter implements IRepository, ILocalCache {
   ): Promise<void> {
     const key = gleamKey(id)
     const gleam = GM_getValue<Gleam | null>(key, null)
+    // In the thin-cache model, a gleam's local key is deleted once it has been
+    // synced to the server (see ILocalCache.clearSynced). Derived-field updates
+    // are authoritative on the server, so a missing local key is expected and
+    // must NOT throw — otherwise tag/revisit edits on already-synced gleams
+    // fail silently (the input clears but the change is lost). Skip the local
+    // write; the server mutation still runs via SyncService.
     if (!gleam) {
-      throw new Error(`Gleam with ID ${id} not found.`)
+      return
     }
 
     // Apply updates strictly to derived mutable fields.

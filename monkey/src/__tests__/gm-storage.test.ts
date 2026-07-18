@@ -120,9 +120,14 @@ describe('GMStorageAdapter — basic CRUD', () => {
     expect(fetched?.lastRevisitedAt).toBe('2026-07-20T12:00:00.000Z')
   })
 
-  test('updateDerivedFields throws for non-existent gleam', async () => {
+  test('updateDerivedFields is a no-op (does not throw) when the local gleam key is absent', async () => {
+    // After a gleam is synced, its local `gleam:<id>` key is cleared
+    // (thin-cache model). A derived-field update must not throw in that case —
+    // the server is the source of truth and still receives the mutation.
+    // Regression: previously threw "not found", causing tag edits on synced
+    // gleams to fail silently (input cleared, tag not added).
     const repo = new GMStorageAdapter()
-    await expect(repo.updateDerivedFields('nonexistent', { tags: [] })).rejects.toThrow('not found')
+    await expect(repo.updateDerivedFields('nonexistent', { tags: ['x'] })).resolves.toBeUndefined()
   })
 
   test('renameTag renames across all gleams', async () => {
