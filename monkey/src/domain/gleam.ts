@@ -1,6 +1,6 @@
-export type { Gleam, Source, SourceType, SourceMedia, MediaKind } from '../../shared/types'
+export type { Gleam, Source, SourceType, SourceMedia, MediaKind } from '@gleam/shared/types'
 
-import type { Gleam, Source } from '../../shared/types'
+import type { Gleam, Source } from '@gleam/shared/types'
 
 /**
  * Creates a new Gleam object with runtime invariants enforced.

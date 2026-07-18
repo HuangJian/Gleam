@@ -1,4 +1,5 @@
 {
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2023",
     "useDefineForClassFields": true,
@@ -6,7 +7,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
 
-    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
@@ -15,7 +15,6 @@
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
 
-    /* Linting */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -30,5 +29,5 @@
       "react/jsx-runtime": ["./node_modules/preact/jsx-runtime"]
     }
   },
-  "include": ["src", "shared"]
+  "include": ["src", "../shared"]
 }

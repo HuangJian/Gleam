@@ -1,5 +1,5 @@
 {
-  "name": "gleam-backend",
+  "name": "@gleam/backend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,10 +9,14 @@
     "build": "tsc --noEmit",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
+    "lint": "oxlint . -c ../.oxlintrc.json",
+    "format": "oxfmt . --disable-nested-config -c ../.oxfmtrc.json",
+    "check": "bun run typecheck && bun run lint && bun test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/database/migrate.ts"
   },
   "dependencies": {
+    "@gleam/shared": "*",
     "@pothos/core": "^4.6.0",
     "arktype": "^2.1.20",
     "drizzle-orm": "^0.44.2",
@@ -20,7 +24,6 @@
     "graphql-yoga": "^5.13.5"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.31.4",
-    "typescript": "^7.0.2"
+    "drizzle-kit": "^0.31.4"
   }
 }

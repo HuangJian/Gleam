@@ -14,7 +14,7 @@ import type {
   TimelineResult,
 } from './repository'
 import { generateHighlight } from '../search/highlight'
-import { parseQuery, evaluateQuery, extractKeywords, QueryParseError } from '@shared/query'
+import { parseQuery, evaluateQuery, extractKeywords, QueryParseError } from '@gleam/shared/query'
 
 const MAX_BATCH_SIZE = 100
 

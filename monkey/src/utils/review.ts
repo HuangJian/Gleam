@@ -4,7 +4,7 @@
  */
 
 // Re-export getSourceHost from the shared query module (single source of truth).
-export { getSourceHost } from '../../shared/query'
+export { getSourceHost } from '@gleam/shared/query'
 
 /** Format an ISO timestamp for display in the review detail header. */
 export function formatReviewTime(isoString: string): string {

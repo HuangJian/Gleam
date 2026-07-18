@@ -36,8 +36,8 @@ import type { Gleam } from './types'
  *
  * ⚠️ 后记（agent 注意）：本文件是查询语言的唯一事实来源（single source of truth）。
  * 若在此修改语法、字段、别名或相对日期，必须同步更新用户文档 `doc/query-language.md`，
- * 以及 `src/ui/components/SearchBar.tsx` 中的示例语句，保持三者一致。
- * 本文件被客户端（src/services/query.ts）和后端（backend/src/repository/sqlite-repository.ts）共享。
+ * 以及 `monkey/src/ui/components/SearchBar.tsx` 中的示例语句，保持三者一致。
+ * 本文件被客户端（monkey/src/services/query.ts）和后端（backend/src/repository/sqlite-repository.ts）共享。
  */
 
 export class QueryParseError extends Error {

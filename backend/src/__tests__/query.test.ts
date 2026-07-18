@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test'
-import { parseQuery, runQuery, extractKeywords } from '@shared/query'
-import type { Gleam } from '@shared/types'
+import { parseQuery, runQuery, extractKeywords } from '@gleam/shared/query'
+import type { Gleam } from '@gleam/shared/types'
 
 function makeGleam(overrides: Partial<Gleam> = {}): Gleam {
   return {

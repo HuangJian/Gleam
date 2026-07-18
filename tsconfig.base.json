@@ -1,18 +1,23 @@
 {
   "compilerOptions": {
     "target": "ES2023",
+    "useDefineForClassFields": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "skipLibCheck": true,
+
+    /* Bundler mode */
     "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "noEmit": true,
+
+    /* Linting */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "types": ["bun"]
-  },
-  "include": ["src", "../shared"]
+    "noFallthroughCasesInSwitch": true
+  }
 }

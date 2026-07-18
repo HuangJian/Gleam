@@ -10,7 +10,7 @@ interface SearchBarProps {
 }
 
 /** Curated example queries shown when a search yields nothing. Keep in sync
- *  with doc/query-language.md and the grammar in src/services/query.ts. */
+ *  with doc/query-language.md and the grammar in monkey/src/services/query.ts. */
 const EXAMPLE_QUERIES: { query: string; label: string }[] = [
   { query: 'react', label: '查找任何包含「react」的微光' },
   { query: '#family', label: '标签为 family 的微光' },

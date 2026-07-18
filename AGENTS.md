@@ -126,44 +126,55 @@ The product model is fully specified in `doc/MANIFEST.md` and its 15 chapters un
 
 ### Tooling
 
-Use Bun for package management and tests. Vite + vite-plugin-monkey handles building. Preact is the UI framework (aliased as `react` via `preact/compat`). Styling uses @emotion/styled with Shadow DOM-scoped cache.
+The repo is a Bun workspace with three packages: `shared` (`@gleam/shared`), `backend` (`@gleam/backend`), and `monkey` (`@gleam/monkey`, the browser userscript client). Use Bun for package management and tests. Vite + vite-plugin-monkey handles building the userscript. Preact is the UI framework (aliased as `react` via `preact/compat`). Styling uses @emotion/styled with Shadow DOM-scoped cache.
 
 ```sh
-bun install
-bun run test
-bun run typecheck
-bun run lint
-bun run format
-bun run build
-bun run check         # typecheck + lint + format + tests + build
+bun install                       # installs the whole workspace
+bun run --filter @gleam/monkey test
+bun run --filter @gleam/monkey typecheck
+bun run --filter @gleam/monkey lint
+bun run --filter @gleam/monkey format
+bun run --filter @gleam/monkey build
+bun run check                     # runs check in every package
 ```
 
-`bun run check` is the preferred final validation.
+`bun run check` (root) is the preferred final validation. Per-package scripts also exist (`bun run --filter @gleam/<pkg> <script>`).
 
 ### Architecture & Layout
 
 ```text
-src/
-  main.tsx             UserScript entry: Shadow DOM mount, Emotion cache, GM menu commands.
-  domain/              Product model — pure types and factory functions. Zero internal deps.
-    gleam.ts           Gleam, Source, SourceType types + createGleam() factory.
-    repository.ts      IRepository interface (the stability anchor).
-  infra/               Replaceable adapters implementing domain interfaces.
-    gm-storage.ts      GMStorageAdapter — GM_setValue/GM_getValue implementation of IRepository.
-  services/            Application logic — orchestrates domain + infra.
-    capture.ts         CaptureService — creates gleams from user input + page context.
-    timeline.ts        TimelineService — groups gleams chronologically, tracks revisits.
-  ui/                  Preact + @emotion/styled components (rendered in Shadow DOM).
-    App.tsx            Root component: orchestrates capture, sidebar, search, export.
-    theme.ts           Design tokens (dark theme, warm gold accents).
-    components/        CapturePanel, CaptureTrigger, GleamCard, ReviewRoom, ReviewFAB, SearchBar.
-  utils/
-    uuid.ts            UUID v7 generation (time-ordered, zero-dependency).
-
-src/__tests__/         Unit tests (bun:test).
-dist/                  Generated .user.js output (do not hand-edit).
-doc/                   Product manifest and chapter derivations.
+shared/                          @gleam/shared — pure types + query language, shared by all clients & backend
+  types.ts                       Gleam, Source, SourceType, SourceMedia, MediaKind.
+  query.ts                       Recall query language (tokenizer → parser → evaluator).
+  index.ts                       Re-exports types + query.
+monkey/                          @gleam/monkey — Tampermonkey UserScript client
+  src/
+    main.tsx             UserScript entry: Shadow DOM mount, Emotion cache, GM menu commands.
+    domain/              Product model — pure types and factory functions. Zero internal deps.
+      gleam.ts           Gleam, Source, SourceType types + createGleam() factory.
+      repository.ts      IRepository interface (the stability anchor).
+    infra/               Replaceable adapters implementing domain interfaces.
+      gm-storage.ts      GMStorageAdapter — GM_setValue/GM_getValue implementation of IRepository.
+    services/            Application logic — orchestrates domain + infra.
+      capture.ts         CaptureService — creates gleams from user input + page context.
+      timeline.ts        TimelineService — groups gleams chronologically, tracks revisits.
+    ui/                  Preact + @emotion/styled components (rendered in Shadow DOM).
+      App.tsx            Root component: orchestrates capture, sidebar, search, export.
+      theme.ts           Design tokens (dark theme, warm gold accents).
+      components/        CapturePanel, CaptureTrigger, GleamCard, ReviewRoom, ReviewFAB, SearchBar.
+    utils/
+      uuid.ts            UUID v7 generation (time-ordered, zero-dependency).
+  src/__tests__/         Unit tests (bun:test).
+  vite.config.ts         Userscript build config (vite-plugin-monkey).
+  bunfig.toml            Test preload (src/__tests__/setup.ts).
+  .oxlintrc.json / .oxfmtrc.json
+  dist/                  Generated .user.js output (do not hand-edit).
+backend/                         @gleam/backend — GraphQL server (graphql-yoga + drizzle + SQLite)
+  src/ ...
+doc/                             Product manifest and chapter derivations.
 ```
+
+Cross-package sharing goes through `@gleam/shared` only (e.g. `import type { Gleam } from '@gleam/shared/types'`). The client and backend both import the query language from `@gleam/shared/query`.
 
 ### Dependency Direction
 
@@ -213,23 +224,23 @@ interface Gleam {
 
 Tampermonkey APIs (`GM_getValue`, `GM_setValue`, `GM_registerMenuCommand`) are declared and used in two places only:
 
-- `src/infra/gm-storage.ts` — storage operations (the adapter pattern).
-- `src/main.tsx` — menu command registration (entry point).
+- `monkey/src/infra/gm-storage.ts` — storage operations (the adapter pattern).
+- `monkey/src/main.tsx` — menu command registration (entry point).
 
 When adding new GM API usage, extend these files. Do not scatter `GM_*` calls across services or UI components. This keeps the infra layer replaceable — when the project migrates to SQLite/GraphQL (per `mvp.plan.md`), only `infra/` and `main.tsx` need to change.
 
 ### Build Rules
 
-- Source files live under `src/`. Generated output lives under `dist/`.
-- Do not hand-edit files in `dist/`; rebuild with `bun run build`.
-- The `// ==UserScript==` metadata block is defined in `vite.config.ts` (`monkey()` plugin config), not in source files.
+- Source files live under `monkey/src/`. Generated output lives under `monkey/dist/`.
+- Do not hand-edit files in `monkey/dist/`; rebuild with `bun run --filter @gleam/monkey build`.
+- The `// ==UserScript==` metadata block is defined in `monkey/vite.config.ts` (`monkey()` plugin config), not in source files.
 
 ### Testing Rules
 
 - Add or update tests for behavior changes before relying on manual browser checks.
 - **Every bug fix must include a regression test.** Minimal unit test that reproduces the bug, fails without the fix, passes with it.
 - Put pure logic in small functions and cover with unit tests.
-- Tests live in `src/__tests__/` and use `bun:test` (`describe`, `test`, `expect` from `bun:test`).
+- Tests live in `monkey/src/__tests__/` and use `bun:test` (`describe`, `test`, `expect` from `bun:test`).
 - Domain logic (`createGleam`, UUID generation, timeline grouping) should always have unit tests.
 - Mock the `IRepository` interface in service tests — do not depend on GM storage.
 - Avoid live network requests in tests.

@@ -7,7 +7,7 @@ import type {
   TimelineOptions,
   DerivedUpdates,
 } from '../infra/server-client'
-import { runQuery } from '../../shared/query'
+import { runQuery } from '@gleam/shared/query'
 
 // ── Cross-tab sync deduplication ───────────────────────
 //
