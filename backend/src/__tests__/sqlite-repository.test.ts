@@ -411,6 +411,22 @@ describe('SqliteRepository.search', () => {
     expect(result.items[0].gleam.id).toBe(g2.id)
   })
 
+  test('bugfix: plain keyword matching only a tag yields no highlight (shows thought)', async () => {
+    const g1 = makeGleam({
+      id: '01978a3e-0001-7c3d-8e4f-5a6b7c8d9e0f',
+      thought: 'A thought about programming, not about the tag word',
+      tags: ['react'],
+    })
+    await repo.appendGleams([g1])
+
+    // "react" is a plain keyword that matches the tag but NOT the thought.
+    // The card should fall back to rendering the thought, so the highlight
+    // must be null (not a snippet containing only the tag name).
+    const result = await repo.search('react')
+    expect(result.total).toBe(1)
+    expect(result.items[0].highlight).toBeNull()
+  })
+
   test('does NOT highlight filter values (tag, domain)', async () => {
     const g1 = makeGleam({
       id: '01978a3e-0001-7c3d-8e4f-5a6b7c8d9e0f',

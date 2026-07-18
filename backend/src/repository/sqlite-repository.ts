@@ -284,7 +284,6 @@ export class SqliteRepository implements IRepository {
           ? generateHighlight(keywords, [
               { text: gleam.thought, weight: 10 },
               { text: gleam.source.title, weight: 6 },
-              { text: gleam.tags.join(' '), weight: 4 },
               { text: gleam.source.excerpt, weight: 2 },
             ])
           : null,
