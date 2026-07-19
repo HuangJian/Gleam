@@ -235,8 +235,14 @@ function buildUserContent(input: LLMInput): string {
   return parts.join('\n')
 }
 
+// The user's `thought` is the core understanding (MANIFEST ch.3) and the
+// primary signal for semantic retrieval, so it is repeated to give it more
+// weight in the embedding than the source context fields.
+const THOUGHT_EMBEDDING_WEIGHT = 3
+
 function buildEmbeddingText(input: LLMInput): string {
-  const parts: string[] = [input.thought]
+  const parts: string[] = []
+  for (let i = 0; i < THOUGHT_EMBEDDING_WEIGHT; i++) parts.push(input.thought)
   if (input.source.title) parts.push(input.source.title)
   if (input.source.excerpt) parts.push(input.source.excerpt)
   return parts.join('\n')
