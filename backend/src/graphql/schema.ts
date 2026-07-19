@@ -1,7 +1,11 @@
 import SchemaBuilder from '@pothos/core'
-import type { IRepository } from '../repository/repository'
+import type { IRepository, IIntelligenceRepository } from '../repository/repository'
 import type { TimelineService } from '../timeline/timeline'
 import type { SearchService } from '../search/search'
+import type { IntelligenceConfigView } from '../domain/gleam-ai'
+import { encrypt, hasEncryptionSecret } from '../config/encryption'
+import { createProviderForValidation } from '../gateway'
+import { logger } from '../util/logger'
 
 // ── Explicit interfaces for Preact object types ─────────
 // (ArkType inferred types don't expose keys to Pothos properly)
@@ -27,12 +31,15 @@ interface GraphQLGleam {
   tags: string[]
   revisitCount: number
   lastRevisitedAt: string
+  // Intelligence fields (resolved via repository, not stored on Gleam)
+  _gleamIdForIntelligence?: string
 }
 
 // ── Context ─────────────────────────────────────────────
 
 export interface GraphQLContext {
   repository: IRepository
+  intelligenceRepository: IIntelligenceRepository
   timelineService: TimelineService
   searchService: SearchService
 }
@@ -81,6 +88,14 @@ const UploadSourceEnum = builder.enumType('UploadSource', {
   values: ['CAPTURE', 'IMPORT'] as const,
 })
 
+const RelationOriginEnum = builder.enumType('RelationOrigin', {
+  values: ['AI', 'USER'] as const,
+})
+
+const ArtifactTypeEnum = builder.enumType('ArtifactType', {
+  values: ['SUMMARY', 'TAGS', 'EMBEDDING', 'RELATION'] as const,
+})
+
 // ── Object Types ────────────────────────────────────────
 
 const SourceMediaType = builder.objectRef<GraphQLSourceMedia>('SourceMedia').implement({
@@ -107,12 +122,29 @@ const SourceType = builder.objectRef<GraphQLSource>('Source').implement({
   }),
 })
 
+// ── Intelligence Types ──────────────────────────────────
+
+// Forward declaration of GleamRelationType so it can be referenced from
+// GleamType.relations below. The implementation follows GleamType because
+// it references GleamType in its `targetGleam` field (mutual recursion).
+const GleamRelationType = builder.objectRef<{
+  id: string
+  sourceGleamId: string
+  targetGleamId: string
+  relationType: string
+  strength: number | null
+  origin: 'ai' | 'user'
+  createdAt: string
+}>('GleamRelation')
+
 const GleamType = builder.objectRef<GraphQLGleam>('Gleam').implement({
   fields: (t) => ({
     id: t.exposeID('id'),
     thought: t.exposeString('thought'),
     source: t.expose('source', { type: SourceType }),
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
+    // `tags` returns the visible tag set (userTags + aiTags − removedTags)
+    // rather than user tags alone. The repository computes this at read time.
     tags: t.exposeStringList('tags'),
     revisitCount: t.exposeInt('revisitCount'),
     // '' maps to null at the GraphQL boundary
@@ -121,8 +153,71 @@ const GleamType = builder.objectRef<GraphQLGleam>('Gleam').implement({
       nullable: true,
       resolve: (parent) => (parent.lastRevisitedAt === '' ? null : parent.lastRevisitedAt),
     }),
+
+    // ── Intelligence fields ────────────────────────────
+    summary: t.field({
+      type: 'String',
+      nullable: true,
+      resolve: async (parent, _args, ctx) => {
+        const ai = await ctx.intelligenceRepository.getGleamAI(parent.id)
+        return ai?.summary ?? null
+      },
+    }),
+
+    aiTags: t.field({
+      type: ['String'],
+      resolve: async (parent, _args, ctx) => {
+        const { aiTags, removedTags } = await ctx.intelligenceRepository.getVisibleTags(parent.id)
+        // aiTags returned to clients are the raw AI suggestions before user
+        // removal — clients use this to display provenance indicators.
+        // (Removed tags are excluded so clients don't show rejected tags.)
+        return aiTags.filter((tag) => !removedTags.includes(tag))
+      },
+    }),
+
+    relations: t.field({
+      type: [GleamRelationType],
+      resolve: async (parent, _args, ctx) => {
+        return ctx.intelligenceRepository.getRelations(parent.id)
+      },
+    }),
   }),
 })
+
+// Implement GleamRelationType after GleamType (mutual recursion resolved).
+GleamRelationType.implement({
+  fields: (t) => ({
+    id: t.exposeID('id'),
+    targetGleam: t.field({
+      type: GleamType,
+      resolve: async (parent, _args, ctx) => {
+        const gleam = await ctx.repository.getGleamById(parent.targetGleamId)
+        if (!gleam) {
+          // Orphaned relation (target deleted in future versions).
+          // Return a placeholder to avoid breaking the GraphQL response.
+          throw new Error(`Relation target not found: ${parent.targetGleamId}`)
+        }
+        return gleam as unknown as GraphQLGleam
+      },
+    }),
+    relationType: t.exposeString('relationType'),
+    strength: t.exposeFloat('strength', { nullable: true }),
+    origin: t.field({
+      type: RelationOriginEnum,
+      resolve: (parent) => parent.origin.toUpperCase() as 'AI' | 'USER',
+    }),
+  }),
+})
+
+const IntelligenceConfigType = builder
+  .objectRef<IntelligenceConfigView>('IntelligenceConfig')
+  .implement({
+    fields: (t) => ({
+      provider: t.exposeString('provider'),
+      model: t.exposeString('model'),
+      hasApiKey: t.exposeBoolean('hasApiKey'),
+    }),
+  })
 
 // ── Search Types ────────────────────────────────────────
 
@@ -239,6 +334,30 @@ const SearchInput = builder.inputType('SearchInput', {
   }),
 })
 
+// ── Intelligence Input Types ────────────────────────────
+
+const ConfigureProviderInput = builder.inputType('ConfigureProviderInput', {
+  fields: (t) => ({
+    provider: t.string({ required: true }),
+    model: t.string({ required: true }),
+    apiKey: t.string({ required: true }),
+  }),
+})
+
+const RemoveTagInput = builder.inputType('RemoveTagInput', {
+  fields: (t) => ({
+    gleamId: t.id({ required: true }),
+    tag: t.string({ required: true }),
+  }),
+})
+
+const RegenerateArtifactInput = builder.inputType('RegenerateArtifactInput', {
+  fields: (t) => ({
+    gleamId: t.id({ required: true }),
+    artifact: t.field({ type: ArtifactTypeEnum, required: true }),
+  }),
+})
+
 // ── Payload Types ───────────────────────────────────────
 
 const AppendErrorType = builder
@@ -286,6 +405,43 @@ const RenameTagPayloadType = builder
     }),
   })
 
+const ConfigureProviderPayloadType = builder
+  .objectRef<{ provider: string; model: string; success: boolean }>('ConfigureProviderPayload')
+  .implement({
+    fields: (t) => ({
+      provider: t.exposeString('provider'),
+      model: t.exposeString('model'),
+      success: t.exposeBoolean('success'),
+    }),
+  })
+
+const RemoveProviderPayloadType = builder
+  .objectRef<{ success: boolean }>('RemoveProviderPayload')
+  .implement({
+    fields: (t) => ({
+      success: t.exposeBoolean('success'),
+    }),
+  })
+
+const RemoveTagPayloadType = builder
+  .objectRef<{ gleamId: string; success: boolean }>('RemoveTagPayload')
+  .implement({
+    fields: (t) => ({
+      gleamId: t.exposeID('gleamId'),
+      success: t.exposeBoolean('success'),
+    }),
+  })
+
+const RegenerateArtifactPayloadType = builder
+  .objectRef<{ gleamId: string; artifact: string; success: boolean }>('RegenerateArtifactPayload')
+  .implement({
+    fields: (t) => ({
+      gleamId: t.exposeID('gleamId'),
+      artifact: t.exposeString('artifact'),
+      success: t.exposeBoolean('success'),
+    }),
+  })
+
 // ── Queries ─────────────────────────────────────────────
 
 builder.queryType({
@@ -314,6 +470,14 @@ builder.queryType({
       resolve: async (_, args, ctx) => {
         const input = args.input
         return ctx.searchService.search(input.query, input.limit ?? 20, input.offset ?? 0)
+      },
+    }),
+
+    intelligenceConfig: t.field({
+      type: IntelligenceConfigType,
+      nullable: true,
+      resolve: async (_root, _args, ctx) => {
+        return ctx.intelligenceRepository.getIntelligenceConfigView()
       },
     }),
   }),
@@ -383,6 +547,99 @@ builder.mutationType({
       resolve: async (_, args, ctx) => {
         const input = args.input
         return ctx.repository.renameTag(input.oldTag, input.newTag)
+      },
+    }),
+
+    // ── Intelligence mutations ──────────────────────────
+
+    configureProvider: t.field({
+      type: ConfigureProviderPayloadType,
+      args: {
+        input: t.arg({ type: ConfigureProviderInput, required: true }),
+      },
+      resolve: async (_, args, ctx) => {
+        const { provider, model, apiKey } = args.input
+
+        if (!hasEncryptionSecret()) {
+          throw new Error(
+            'GLEAM_BACKEND_SECRET environment variable is required to configure a provider. ' +
+              'Set it to a stable, secret string (e.g. `openssl rand -hex 32`).',
+          )
+        }
+
+        // Validate before persisting — invalid credentials are rejected
+        // immediately. Only usable provider configurations are stored.
+        const probe = createProviderForValidation(provider, model, apiKey)
+        try {
+          await probe.validateConfig()
+        } catch (e) {
+          logger.warn('Provider validation failed', {
+            provider,
+            model,
+            error: e instanceof Error ? e.message : String(e),
+          })
+          throw new Error(
+            `Provider validation failed: ${e instanceof Error ? e.message : String(e)}`,
+            { cause: e },
+          )
+        }
+
+        const encrypted = encrypt(apiKey)
+        await ctx.intelligenceRepository.saveIntelligenceConfig({
+          provider,
+          model,
+          encryptedApiKey: encrypted.ciphertext,
+          apiKeyIv: encrypted.iv,
+          updatedAt: new Date().toISOString(),
+        })
+
+        logger.info('Provider configured', { provider, model })
+        return { provider, model, success: true }
+      },
+    }),
+
+    removeProvider: t.field({
+      type: RemoveProviderPayloadType,
+      resolve: async (_root, _args, ctx) => {
+        await ctx.intelligenceRepository.removeIntelligenceConfig()
+        logger.info('Provider removed')
+        return { success: true }
+      },
+    }),
+
+    removeTag: t.field({
+      type: RemoveTagPayloadType,
+      args: {
+        input: t.arg({ type: RemoveTagInput, required: true }),
+      },
+      resolve: async (_, args, ctx) => {
+        const { gleamId, tag } = args.input
+        return ctx.repository.removeTag(gleamId, tag)
+      },
+    }),
+
+    regenerateArtifact: t.field({
+      type: RegenerateArtifactPayloadType,
+      args: {
+        input: t.arg({ type: RegenerateArtifactInput, required: true }),
+      },
+      resolve: async (_, args, ctx) => {
+        const { gleamId, artifact } = args.input
+        // GraphQL never invokes semantic computation directly — it only
+        // changes Repository state. The Scheduler discovers the new
+        // work during a later observation cycle.
+        const artifactLower = artifact.toLowerCase() as
+          | 'summary'
+          | 'tags'
+          | 'embedding'
+          | 'relation'
+
+        // Ensure a gleam_ai row exists for this Gleam.
+        await ctx.intelligenceRepository.createGleamAI(gleamId)
+        await ctx.intelligenceRepository.setArtifactStatus(gleamId, artifactLower, 'pending')
+
+        logger.info('Artifact scheduled for regeneration', { gleamId, artifact })
+        return { gleamId, artifact, success: true }
       },
     }),
   }),

@@ -7,6 +7,10 @@ import { SearchService } from './search/search'
 import { loadConfig } from './config'
 import { logger, setLogLevel } from './util/logger'
 import type { GraphQLContext } from './graphql/schema'
+import { PromptRegistry } from './intelligence/prompt-registry'
+import { ObservationPipeline } from './intelligence/pipeline'
+import { Scheduler } from './intelligence/scheduler'
+import { hasEncryptionSecret } from './config/encryption'
 
 async function main() {
   const config = loadConfig()
@@ -20,8 +24,48 @@ async function main() {
   const timelineService = new TimelineService(repository)
   const searchService = new SearchService(repository)
 
+  // ── Intelligence subsystem ──────────────────────────
+  //
+  // Startup sequence (per plan §11):
+  //   1. Load Prompt Registry (scan prompts/ directory).
+  //   2. Stage prompt snapshots into prompt_history (idempotent).
+  //   3. Construct Observation Pipeline + Scheduler.
+  //   4. Scheduler.start() performs stale-running recovery, then
+  //      begins polling.
+  //
+  // Repository startup never waits for pending semantic work to
+  // complete — observation resumes gradually after initialization.
+  const promptRegistry = new PromptRegistry(config.promptsDir)
+  promptRegistry.load()
+  await promptRegistry.stageSnapshots(repository)
+
+  const pipeline = new ObservationPipeline(
+    repository,
+    promptRegistry,
+    config.relationThreshold,
+    config.relationLimit,
+  )
+
+  const scheduler = new Scheduler(
+    repository,
+    repository,
+    pipeline,
+    config.schedulerIntervalMs,
+    config.schedulerBatchSize,
+  )
+
+  if (!hasEncryptionSecret()) {
+    logger.warn(
+      'GLEAM_BACKEND_SECRET is not set — Intelligence provider configuration will be unavailable. ' +
+        'Set GLEAM_BACKEND_SECRET to enable LLM-based semantic observation.',
+    )
+  }
+
+  // Start the scheduler only after the HTTP server is listening so that
+  // health checks succeed before background work begins.
   const context = (): GraphQLContext => ({
     repository,
+    intelligenceRepository: repository,
     timelineService,
     searchService,
   })
@@ -44,6 +88,9 @@ async function main() {
     port: config.port,
     fetch: yoga,
   })
+
+  // Begin background observation now that the server is ready.
+  scheduler.start()
 
   logger.info('Gleam backend is running', { url: `http://localhost:${server.port}/graphql` })
 }
