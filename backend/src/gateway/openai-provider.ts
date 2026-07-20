@@ -37,6 +37,13 @@ interface OpenAIProviderOptions {
   embeddingModel: string
   /** Base URL override (for testing or OpenAI-compatible providers). */
   baseUrl?: string
+  /**
+   * Disable chain-of-thought for reasoning models (e.g. NVIDIA
+   * nemotron-3-ultra). When true, chat requests send
+   * `reasoning: { enabled: false }` so `content` holds only the answer.
+   * Standard OpenAI models reject the param, so it is opt-in.
+   */
+  reasoningEnabled?: boolean
 }
 
 export class OpenAIProvider implements LLMProvider {
@@ -47,11 +54,13 @@ export class OpenAIProvider implements LLMProvider {
   private readonly apiKey: string
   private readonly chatUrl: string
   private readonly embeddingsUrl: string
+  private readonly reasoningEnabled: boolean
 
   constructor(opts: OpenAIProviderOptions) {
     this.apiKey = opts.apiKey
     this.model = opts.model
     this.embeddingModel = opts.embeddingModel
+    this.reasoningEnabled = opts.reasoningEnabled ?? false
     const base = (opts.baseUrl ?? '').replace(/\/$/, '')
     this.chatUrl = base ? `${base}/v1/chat/completions` : OPENAI_CHAT_URL
     this.embeddingsUrl = base ? `${base}/v1/embeddings` : OPENAI_EMBEDDINGS_URL
@@ -176,18 +185,25 @@ export class OpenAIProvider implements LLMProvider {
   }> {
     let res: Response
     try {
+      const body: Record<string, unknown> = {
+        model: this.model,
+        temperature: opts.temperature,
+        max_tokens: opts.maxTokens,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userContent },
+        ],
+      }
+      // Reasoning models (e.g. NVIDIA nemotron-3-ultra) emit chain-of-thought
+      // into `content` by default; disabling keeps `content` clean. Standard
+      // OpenAI models reject the param, so it is only sent when opted in.
+      if (this.reasoningEnabled) {
+        body.reasoning = { enabled: false }
+      }
       res = await fetch(this.chatUrl, {
         method: 'POST',
         headers: this.headers(),
-        body: JSON.stringify({
-          model: this.model,
-          temperature: opts.temperature,
-          max_tokens: opts.maxTokens,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userContent },
-          ],
-        }),
+        body: JSON.stringify(body),
       })
     } catch (e) {
       throw new LLMError(
@@ -257,6 +273,13 @@ function buildEmbeddingText(input: LLMInput): string {
  *   - One-per-line: tag1\ntag2
  *
  * Strips leading `#` from each tag and trims whitespace.
+ *
+ * NOTE: case is NOT normalized. Reasoning models (e.g. NVIDIA
+ * nemotron-3-ultra) occasionally emit camelCase tags (e.g. `useReducer`)
+ * that violate the lowercase kebab-case contract the Tags prompt requests.
+ * This is a known model-adherence gap — callers that require strict
+ * kebab-case must normalize downstream (see validate-tags.ts, which
+ * reports such tags as a WARN rather than failing).
  */
 function parseTagsResponse(raw: string): string[] {
   // Try JSON first.
