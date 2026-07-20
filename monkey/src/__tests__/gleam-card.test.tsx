@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, afterEach } from 'bun:test'
 import { render, fireEvent, cleanup } from '@testing-library/preact'
 import { GleamCard } from '../ui/components/GleamCard'
-import { makeGleam } from './helpers'
+import { makeGleam, makeIntelligence } from './helpers'
 
 describe('GleamCard', () => {
   afterEach(cleanup)
@@ -56,5 +56,55 @@ describe('GleamCard', () => {
     fireEvent.click(getByText('A flash of understanding.'))
     expect(onRevisit).toHaveBeenCalledWith('card-1')
     expect(onClick).toHaveBeenCalledWith(gleam)
+  })
+
+  // ── AI Summary Display ──
+
+  test('renders AI summary when intelligence.summary is present', () => {
+    const gleam = makeGleam({ thought: 'React hooks are powerful.' })
+    const intelligence = makeIntelligence({
+      summary: 'Hooks let function components manage state.',
+    })
+    const { getByText } = render(
+      <GleamCard gleam={gleam} intelligence={intelligence} onRevisit={() => {}} />,
+    )
+    expect(getByText('Hooks let function components manage state.')).toBeTruthy()
+  })
+
+  test('does not render AI summary when intelligence.summary is null', () => {
+    const gleam = makeGleam({ thought: 'No summary here.' })
+    const intelligence = makeIntelligence({ summary: null })
+    const { container } = render(
+      <GleamCard gleam={gleam} intelligence={intelligence} onRevisit={() => {}} />,
+    )
+    expect(container.textContent).not.toContain('AI:')
+  })
+
+  test('does not render AI summary when intelligence is absent', () => {
+    const gleam = makeGleam({ thought: 'No intelligence prop.' })
+    const { container } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
+    expect(container.textContent).not.toContain('✦')
+  })
+
+  // ── Tag Provenance ──
+
+  test('shows ✦ indicator on AI-suggested tags', () => {
+    const gleam = makeGleam({ tags: ['react', 'hooks'] })
+    const intelligence = makeIntelligence({ aiTags: ['react'] })
+    const { getAllByText } = render(
+      <GleamCard gleam={gleam} intelligence={intelligence} onRevisit={() => {}} />,
+    )
+    // Only 'react' should have the ✦ prefix
+    const aiPrefixes = getAllByText('✦')
+    expect(aiPrefixes).toHaveLength(1)
+  })
+
+  test('does not show ✦ on user-only tags', () => {
+    const gleam = makeGleam({ tags: ['react', 'hooks'] })
+    const intelligence = makeIntelligence({ aiTags: [] })
+    const { queryAllByText } = render(
+      <GleamCard gleam={gleam} intelligence={intelligence} onRevisit={() => {}} />,
+    )
+    expect(queryAllByText('✦')).toHaveLength(0)
   })
 })

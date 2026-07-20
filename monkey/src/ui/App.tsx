@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks'
-import { Gleam, SourceMedia } from '../domain/gleam'
+import { SourceMedia } from '../domain/gleam'
+import type { GleamWithIntelligence } from '../domain/intelligence'
 import { IRepository } from '../domain/repository'
 import { CaptureService } from '../services/capture'
 import { groupByDate, TimelineGroup } from '../services/timeline'
@@ -28,7 +29,7 @@ export function App({ repository, syncService, shadowHost }: AppProps) {
   const [activeMedia, setActiveMedia] = useState<SourceMedia | undefined>(undefined)
   const [timelineGroups, setTimelineGroups] = useState<TimelineGroup[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [viewingGleam, setViewingGleam] = useState<Gleam | null>(null)
+  const [viewingGleam, setViewingGleam] = useState<GleamWithIntelligence | null>(null)
   const [tagCounts, setTagCounts] = useState<TagCount[]>([])
   const [syncState, setSyncState] = useState<SyncState>(syncService.getState())
   const [highlights, setHighlights] = useState<Record<string, string | null>>({})
@@ -44,28 +45,43 @@ export function App({ repository, syncService, shadowHost }: AppProps) {
 
   // Load timeline (and tag counts when unfiltered)
   const refreshTimeline = async (query = searchQuery) => {
-    let gleams: Gleam[]
+    let items: GleamWithIntelligence[]
     const newHighlights: Record<string, string | null> = {}
     if (query && query.trim() !== '') {
       const result = await syncService.search(query)
-      gleams = result.items.map((h) => {
-        newHighlights[h.gleam.id] = h.highlight
-        return h.gleam
+      items = result.items.map((h) => {
+        newHighlights[h.item.gleam.id] = h.highlight
+        return h.item
       })
       setHighlights(newHighlights)
     } else {
       const result = await syncService.getTimeline()
-      gleams = result.items
+      items = result.items
       setHighlights({})
       // Recompute tag counts from the full (unfiltered) timeline
-      setTagCounts(countTags(gleams))
+      setTagCounts(countTags(items))
     }
-    setTimelineGroups(groupByDate(gleams))
+    setTimelineGroups(groupByDate(items))
+
+    // Refresh viewingGleam's intelligence from the new timeline data
+    if (viewingGleam) {
+      const updated = items.find((i) => i.gleam.id === viewingGleam.gleam.id)
+      if (updated) setViewingGleam(updated)
+    }
   }
 
   useEffect(() => {
     refreshTimeline()
   }, [searchQuery])
+
+  // Periodic refresh: pick up new AI artifacts while ReviewRoom is open
+  useEffect(() => {
+    if (!isReviewOpen) return
+    const interval = setInterval(() => {
+      refreshTimeline()
+    }, 30_000)
+    return () => clearInterval(interval)
+  }, [isReviewOpen])
 
   // Handle global shortcuts: Ctrl+Shift+G or Cmd+Shift+G to trigger quick capture
   useEffect(() => {
@@ -130,47 +146,59 @@ export function App({ repository, syncService, shadowHost }: AppProps) {
     setIsCaptureOpen(true)
   }
 
-  const handleViewGleam = (gleam: Gleam) => {
-    setViewingGleam(gleam)
+  const handleViewGleam = (item: GleamWithIntelligence) => {
+    setViewingGleam(item)
   }
 
   const handleRevisitGleam = async (id: string) => {
     // Find the gleam in current timeline to read the current revisit count
-    const gleam = timelineGroups.flatMap((g) => g.gleams).find((g) => g.id === id)
-    if (!gleam) return
-    const nextCount = gleam.revisitCount + 1
+    const current = timelineGroups.flatMap((g) => g.gleams).find((g) => g.gleam.id === id)
+    if (!current) return
+    const nextCount = current.gleam.revisitCount + 1
     await syncService.updateDerivedFields(id, {
       revisitCount: nextCount,
       lastRevisitedAt: new Date().toISOString(),
     })
-    setViewingGleam({ ...gleam, revisitCount: nextCount })
+    setViewingGleam({
+      gleam: { ...current.gleam, revisitCount: nextCount },
+      intelligence: current.intelligence,
+    })
     await refreshTimeline()
   }
 
   const handleAddTag = async (gleamId: string, tag: string) => {
-    const gleam =
-      viewingGleam ?? timelineGroups.flatMap((g) => g.gleams).find((g) => g.id === gleamId)
-    if (!gleam) return
-    const next = Array.from(new Set([...gleam.tags, tag]))
+    const current =
+      viewingGleam ?? timelineGroups.flatMap((g) => g.gleams).find((g) => g.gleam.id === gleamId)
+    if (!current) return
+    const next = Array.from(new Set([...current.gleam.tags, tag]))
     await syncService.updateDerivedFields(gleamId, { tags: next })
-    setViewingGleam({ ...gleam, tags: next })
+    setViewingGleam({
+      gleam: { ...current.gleam, tags: next },
+      intelligence: current.intelligence,
+    })
     await refreshTimeline()
   }
 
   const handleRemoveTag = async (gleamId: string, tag: string) => {
-    const gleam =
-      viewingGleam ?? timelineGroups.flatMap((g) => g.gleams).find((g) => g.id === gleamId)
-    if (!gleam) return
-    const next = gleam.tags.filter((t) => t !== tag)
-    await syncService.updateDerivedFields(gleamId, { tags: next })
-    setViewingGleam({ ...gleam, tags: next })
+    const current =
+      viewingGleam ?? timelineGroups.flatMap((g) => g.gleams).find((g) => g.gleam.id === gleamId)
+    if (!current) return
+    await syncService.removeTag(gleamId, tag)
+    setViewingGleam({
+      gleam: { ...current.gleam, tags: current.gleam.tags.filter((t) => t !== tag) },
+      intelligence: current.intelligence,
+    })
     await refreshTimeline()
   }
 
   const handleExportData = async () => {
     try {
       const result = await syncService.getTimeline({ limit: 10000 })
-      const dataStr = JSON.stringify(result.items, null, 2)
+      const dataStr = JSON.stringify(
+        result.items.map((i) => i.gleam),
+        null,
+        2,
+      )
       const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr)
 
       const exportFileDefaultName = `gleam_export_${new Date().toISOString().slice(0, 10)}.json`
@@ -226,12 +254,19 @@ export function App({ repository, syncService, shadowHost }: AppProps) {
         onAddGleam={handleAddGleam}
         viewingGleam={viewingGleam}
         onOpenGleam={handleViewGleam}
+        onGetRelations={(gleamId: string) => syncService.getGleamRelations(gleamId)}
         tagCounts={tagCounts}
         onAddTag={handleAddTag}
         onRemoveTag={handleRemoveTag}
         syncState={syncState}
         highlights={highlights}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onRegenerateArtifact={async (
+          gleamId: string,
+          artifact: 'SUMMARY' | 'TAGS' | 'EMBEDDING' | 'RELATION',
+        ) => {
+          await syncService.regenerateArtifact(gleamId, artifact)
+        }}
       />
 
       {/* Settings Panel Modal */}
@@ -246,6 +281,11 @@ export function App({ repository, syncService, shadowHost }: AppProps) {
           await syncService.syncPending()
           await refreshTimeline()
         }}
+        onGetIntelligenceConfig={() => syncService.getIntelligenceConfig()}
+        onConfigureProvider={(provider, model, apiKey) =>
+          syncService.configureProvider(provider, model, apiKey)
+        }
+        onRemoveProvider={() => syncService.removeProvider()}
       />
     </>
   )

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'preact/hooks'
 import styled from '@emotion/styled'
-import { Gleam } from '../../domain/gleam'
+import type { GleamWithIntelligence, GleamRelation, ArtifactType } from '../../domain/intelligence'
 import { TimelineGroup } from '../../services/timeline'
 import { GleamCard } from './GleamCard'
+import { RelationList } from './RelationList'
 import { SearchBar, EXAMPLE_QUERIES } from './SearchBar'
 import { MarkdownPreview } from './MarkdownPreview'
 import { MediaPreview } from './MediaPreview'
@@ -54,8 +55,10 @@ interface ReviewRoomProps {
   onSearch: (query: string) => void
   onExport: () => void
   onAddGleam: () => void
-  viewingGleam: Gleam | null
-  onOpenGleam: (gleam: Gleam) => void
+  viewingGleam: GleamWithIntelligence | null
+  onOpenGleam: (item: GleamWithIntelligence) => void
+  onGetRelations: (gleamId: string) => Promise<GleamRelation[]>
+  onRegenerateArtifact: (gleamId: string, artifact: ArtifactType) => Promise<void>
   tagCounts: TagCount[]
   onAddTag: (gleamId: string, tag: string) => Promise<void>
   onRemoveTag: (gleamId: string, tag: string) => Promise<void>
@@ -74,6 +77,8 @@ export function ReviewRoom({
   onAddGleam,
   viewingGleam,
   onOpenGleam,
+  onGetRelations,
+  onRegenerateArtifact,
   tagCounts,
   onAddTag,
   onRemoveTag,
@@ -83,6 +88,8 @@ export function ReviewRoom({
 }: ReviewRoomProps) {
   const [range, setRange] = useState<RangeOption>('近三天')
   const [searchQuery, setSearchQuery] = useState(() => rangeToQuery('近三天'))
+  const [relations, setRelations] = useState<GleamRelation[]>([])
+  const [regenerating, setRegenerating] = useState<ArtifactType | null>(null)
 
   // A custom query (typed by the user) that matched nothing → show examples.
   // Preset ranges that match nothing still show the generic empty state.
@@ -113,17 +120,69 @@ export function ReviewRoom({
     }
   }, [isOpen])
 
+  // Fetch relations when viewingGleam changes
+  useEffect(() => {
+    if (!viewingGleam) {
+      setRelations([])
+      return
+    }
+    // Switching Gleams resets both relations and the optimistic
+    // regeneration state — a "已请求" badge from a previous Gleam
+    // must not persist onto the newly opened one.
+    setRegenerating(null)
+    let cancelled = false
+    onGetRelations(viewingGleam.gleam.id)
+      .then((rels) => {
+        if (!cancelled) setRelations(rels)
+      })
+      .catch(() => {
+        if (!cancelled) setRelations([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [viewingGleam?.gleam.id])
+
+  const handleRegenerate = async (artifact: ArtifactType) => {
+    if (!viewingGleam) return
+    setRegenerating(artifact)
+    await onRegenerateArtifact(viewingGleam.gleam.id, artifact)
+  }
+
   if (!isOpen) return null
 
   const countMap = new Map(tagCounts.map((tc) => [tc.tag, tc.count]))
   const sortedTags = viewingGleam
-    ? viewingGleam.tags.slice().sort((a, b) => (countMap.get(b) ?? 0) - (countMap.get(a) ?? 0))
+    ? viewingGleam.gleam.tags
+        .slice()
+        .sort((a, b) => (countMap.get(b) ?? 0) - (countMap.get(a) ?? 0))
     : []
 
-  const handleCardClick = (gleam: Gleam) => {
-    onOpenGleam(gleam)
-    void onRevisitGleam(gleam.id)
+  // handleCardClick — ONLY opens the detail view.
+  // Revisit counting is handled by GleamCard's own `onRevisit` prop (above),
+  // which fires inside GleamCard.handleCardClick. Calling onRevisitGleam here
+  // too would double-count the revisit (+2). This also fixes a pre-existing
+  // bug in the current ReviewRoom where handleCardClick called onRevisitGleam
+  // AND GleamCard's onRevisit both fired.
+  const handleCardClick = (item: GleamWithIntelligence) => {
+    onOpenGleam(item)
   }
+
+  const handleRelationClick = (targetId: string) => {
+    // Both ends of a relation are in the same repository, so the target
+    // is already in the timeline. Look it up from loaded data.
+    const found = timelineGroups.flatMap((g) => g.gleams).find((item) => item.gleam.id === targetId)
+    if (found) {
+      onOpenGleam(found)
+      // NOTE: deliberately does NOT call onRevisitGleam — relation
+      // navigation is discovery, not a "revisit" of the user's own gleam.
+    }
+    // If not found (edge case: target filtered out of current time range),
+    // the click is a no-op. A future enhancement could fetch it individually.
+  }
+
+  const summary = viewingGleam?.intelligence.summary ?? null
+  const aiTagSet = new Set(viewingGleam?.intelligence.aiTags ?? [])
 
   return (
     <Overlay data-testid="review-room">
@@ -215,15 +274,16 @@ export function ReviewRoom({
                         <GroupLine />
                       </GroupHeader>
                       <GleamList>
-                        {group.gleams.map((gleam) => (
+                        {group.gleams.map((item) => (
                           <GleamCard
-                            key={gleam.id}
-                            gleam={gleam}
-                            selected={viewingGleam?.id === gleam.id}
-                            tagCounts={tagCounts}
+                            key={item.gleam.id}
+                            gleam={item.gleam}
+                            intelligence={item.intelligence}
                             onRevisit={onRevisitGleam}
-                            onClick={handleCardClick}
-                            highlight={highlights[gleam.id] ?? null}
+                            onClick={() => handleCardClick(item)}
+                            selected={viewingGleam?.gleam.id === item.gleam.id}
+                            tagCounts={tagCounts}
+                            highlight={highlights[item.gleam.id] ?? null}
                           />
                         ))}
                       </GleamList>
@@ -242,19 +302,21 @@ export function ReviewRoom({
                     {sortedTags.map((tag) => (
                       <HeaderTagChip
                         key={tag}
-                        onClick={() => onRemoveTag(viewingGleam.id, tag)}
+                        $ai={aiTagSet.has(tag)}
+                        onClick={() => onRemoveTag(viewingGleam.gleam.id, tag)}
                         title={`${tag} · 用于 ${countMap.get(tag) ?? 0} 条拾光 · 点击移除`}
                       >
+                        {aiTagSet.has(tag) && <span>✦</span>}
                         {tag}
                         <HeaderTagRemove aria-hidden>&times;</HeaderTagRemove>
                       </HeaderTagChip>
                     ))}
                   </HeaderTags>
-                  <DetailTime>{formatReviewTime(viewingGleam.createdAt)}</DetailTime>
+                  <DetailTime>{formatReviewTime(viewingGleam.gleam.createdAt)}</DetailTime>
                   <DetailActions>
-                    {viewingGleam.revisitCount > 0 ? (
-                      <RevisitBadge title={`回顾次数: ${viewingGleam.revisitCount}`}>
-                        👁 {viewingGleam.revisitCount}
+                    {viewingGleam.gleam.revisitCount > 0 ? (
+                      <RevisitBadge title={`回顾次数: ${viewingGleam.gleam.revisitCount}`}>
+                        👁 {viewingGleam.gleam.revisitCount}
                       </RevisitBadge>
                     ) : null}
                   </DetailActions>
@@ -262,38 +324,63 @@ export function ReviewRoom({
 
                 <DetailContent>
                   <ThoughtText>
-                    <MarkdownPreview content={viewingGleam.thought} />
+                    <MarkdownPreview content={viewingGleam.gleam.thought} />
                   </ThoughtText>
 
-                  {viewingGleam.source.excerpt && (
-                    <SourceExcerpt text={viewingGleam.source.excerpt} />
+                  {summary && (
+                    <AIObservationSection>
+                      <AIObservationHeader>
+                        <AIObservationLabel>AI 观察</AIObservationLabel>
+                        <RegenerateButton
+                          onClick={() => handleRegenerate('SUMMARY')}
+                          title="重新生成摘要"
+                          disabled={regenerating === 'SUMMARY'}
+                        >
+                          {regenerating === 'SUMMARY' ? '已请求' : '↻'}
+                        </RegenerateButton>
+                      </AIObservationHeader>
+                      <AISummaryText>
+                        <AIPrefix>✦</AIPrefix>
+                        {summary}
+                      </AISummaryText>
+                    </AIObservationSection>
                   )}
 
-                  {viewingGleam.source.media && <MediaPreview media={viewingGleam.source.media} />}
+                  {viewingGleam.gleam.source.excerpt && (
+                    <SourceExcerpt text={viewingGleam.gleam.source.excerpt} />
+                  )}
 
-                  {viewingGleam.source.url && (
+                  {viewingGleam.gleam.source.media && (
+                    <MediaPreview media={viewingGleam.gleam.source.media} />
+                  )}
+
+                  {viewingGleam.gleam.source.url && (
                     <SourceFooter>
                       <SourceIcon viewBox="0 0 24 24">
                         <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z" />
                       </SourceIcon>
                       <LinkAnchor
-                        href={viewingGleam.source.url}
+                        href={viewingGleam.gleam.source.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title={viewingGleam.source.url}
+                        title={viewingGleam.gleam.source.url}
                       >
-                        {viewingGleam.source.title ||
-                          getSourceHost(viewingGleam.source.url) ||
+                        {viewingGleam.gleam.source.title ||
+                          getSourceHost(viewingGleam.gleam.source.url) ||
                           '原始页面'}
                       </LinkAnchor>
-                      <SourceHost>{getSourceHost(viewingGleam.source.url)}</SourceHost>
+                      <SourceHost>{getSourceHost(viewingGleam.gleam.source.url)}</SourceHost>
                     </SourceFooter>
                   )}
 
+                  <RelationList relations={relations} onRelationClick={handleRelationClick} />
+
                   <TagEditor
-                    tags={viewingGleam.tags}
+                    tags={viewingGleam.gleam.tags}
                     tagCounts={tagCounts}
-                    onAdd={(tag) => onAddTag(viewingGleam.id, tag)}
+                    aiTags={viewingGleam.intelligence.aiTags}
+                    onAdd={(tag) => onAddTag(viewingGleam.gleam.id, tag)}
+                    onRemove={(tag) => onRemoveTag(viewingGleam.gleam.id, tag)}
                   />
                 </DetailContent>
               </>
@@ -759,13 +846,14 @@ const HeaderTags = styled.div`
   padding: 0 8px;
 `
 
-const HeaderTagChip = styled.span`
+const HeaderTagChip = styled.span<{ $ai: boolean }>`
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  background: rgba(200, 180, 140, 0.15);
-  border: 1px solid ${theme.colors.border.light};
+  background: ${(p) => (p.$ai ? theme.colors.intelligence.tagBg : 'rgba(200, 180, 140, 0.15)')};
+  border: 1px ${(p) => (p.$ai ? 'dashed' : 'solid')}
+    ${(p) => (p.$ai ? theme.colors.intelligence.tagBorder : theme.colors.border.light)};
   border-radius: 10px;
   padding: 1px 6px 1px 8px;
   font-size: 11px;
@@ -815,6 +903,65 @@ const ThoughtText = styled.div`
   font-size: 15px;
   line-height: 1.6;
   color: ${theme.colors.text.primary};
+`
+
+const AIObservationSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 1px solid ${theme.colors.border.card};
+  border-bottom: 1px solid ${theme.colors.border.card};
+`
+
+const AIObservationHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`
+
+const AIObservationLabel = styled.span`
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: ${theme.colors.intelligence.accent};
+`
+
+const RegenerateButton = styled.button`
+  background: none;
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: ${theme.colors.text.muted};
+  cursor: pointer;
+  font-family: inherit;
+  transition: ${theme.animations.transition};
+
+  &:hover:not(:disabled) {
+    color: ${theme.colors.intelligence.accent};
+    border-color: ${theme.colors.intelligence.accent};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+`
+
+const AISummaryText = styled.div`
+  display: flex;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: ${theme.colors.intelligence.summaryText};
+  font-style: italic;
+`
+
+const AIPrefix = styled.span`
+  color: ${theme.colors.intelligence.accent};
+  flex-shrink: 0;
 `
 
 const SourceFooter = styled.div`

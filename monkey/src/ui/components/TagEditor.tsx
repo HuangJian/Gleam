@@ -6,10 +6,12 @@ import { TagCount } from '../../services/tag'
 interface TagEditorProps {
   tags: string[]
   tagCounts: TagCount[]
+  aiTags?: string[]
   onAdd: (tag: string) => void
+  onRemove?: (tag: string) => void
 }
 
-export function TagEditor({ tags, tagCounts, onAdd }: TagEditorProps) {
+export function TagEditor({ tags, tagCounts, aiTags = [], onAdd, onRemove }: TagEditorProps) {
   const [draft, setDraft] = useState('')
   const [composing, setComposing] = useState(false)
 
@@ -28,6 +30,8 @@ export function TagEditor({ tags, tagCounts, onAdd }: TagEditorProps) {
     onAdd(value)
     setDraft('')
   }
+
+  const aiTagSet = new Set(aiTags)
 
   return (
     <Wrapper>
@@ -86,6 +90,23 @@ export function TagEditor({ tags, tagCounts, onAdd }: TagEditorProps) {
             </SuggestionChip>
           ))}
         </Suggestions>
+      )}
+
+      {tags.length > 0 && (
+        <CurrentTags>
+          {tags.map((tag) => (
+            <CurrentTagChip
+              key={tag}
+              $ai={aiTagSet.has(tag)}
+              onClick={() => onRemove?.(tag)}
+              title={aiTagSet.has(tag) ? `${tag} · AI 建议 · 点击移除` : `${tag} · 点击移除`}
+            >
+              {aiTagSet.has(tag) && <span>✦</span>}
+              {tag}
+              {onRemove && <RemoveIcon aria-hidden>&times;</RemoveIcon>}
+            </CurrentTagChip>
+          ))}
+        </CurrentTags>
       )}
     </Wrapper>
   )
@@ -241,4 +262,36 @@ const Count = styled.span`
   background: rgba(200, 180, 140, 0.15);
   border-radius: 10px;
   padding: 1px 6px;
+`
+
+const CurrentTags = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+`
+
+const CurrentTagChip = styled.span<{ $ai: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: ${(p) => (p.$ai ? theme.colors.intelligence.tagBg : 'rgba(200, 180, 140, 0.15)')};
+  border: 1px ${(p) => (p.$ai ? 'dashed' : 'solid')}
+    ${(p) => (p.$ai ? theme.colors.intelligence.tagBorder : theme.colors.border.light)};
+  border-radius: 10px;
+  padding: 1px 6px 1px 8px;
+  font-size: 12px;
+  color: ${theme.colors.text.secondary};
+  cursor: pointer;
+  transition: ${theme.animations.transition};
+
+  &:hover {
+    color: ${theme.colors.text.accent};
+    border-color: ${theme.colors.border.focus};
+  }
+`
+
+const RemoveIcon = styled.span`
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.6;
 `

@@ -1,5 +1,11 @@
 import type { IRepository, ILocalCache } from '../domain/repository'
 import type {
+  GleamIntelligence,
+  GleamRelation,
+  IntelligenceConfigView,
+  ArtifactType,
+} from '../domain/intelligence'
+import type {
   ServerClient,
   SearchHit,
   SearchResult,
@@ -191,7 +197,10 @@ export class SyncService {
       items.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       this.setState({ status: 'disconnected', error: '离线模式：显示本地缓存' })
       return {
-        items,
+        items: items.map((gleam) => ({
+          gleam,
+          intelligence: { summary: null, aiTags: [] } as GleamIntelligence,
+        })),
         total: items.length,
         hasMore: false,
         source: 'local',
@@ -210,7 +219,10 @@ export class SyncService {
       const allGleams = await this.repository.getAll()
       const matched = runQuery(query, allGleams)
       const items: SearchHit[] = matched.slice(offset, offset + limit).map((gleam) => ({
-        gleam,
+        item: {
+          gleam,
+          intelligence: { summary: null, aiTags: [] } as GleamIntelligence,
+        },
         score: 1,
         highlight: null, // local search doesn't produce highlights
       }))
@@ -244,6 +256,75 @@ export class SyncService {
       await this.serverClient.renameTag(oldTag, newTag)
     } catch {
       console.debug('[gleam] Server renameTag failed, local only')
+    }
+  }
+
+  // ── Intelligence methods ────────────────────────────
+
+  /** Fetches provider config. Returns null if server unavailable. */
+  async getIntelligenceConfig(): Promise<IntelligenceConfigView | null> {
+    try {
+      return await this.serverClient.getIntelligenceConfig()
+    } catch {
+      return null
+    }
+  }
+
+  /** Configures provider. Throws on validation failure. */
+  async configureProvider(provider: string, model: string, apiKey: string): Promise<void> {
+    await this.serverClient.configureProvider(provider, model, apiKey)
+  }
+
+  /** Removes provider configuration. */
+  async removeProvider(): Promise<void> {
+    await this.serverClient.removeProvider()
+  }
+
+  /**
+   * Removes a tag — local-first with best-effort server sync.
+   *
+   * 1. Update local repository immediately (optimistic).
+   * 2. Call serverClient.removeTag (which records removed_tags).
+   * 3. On server failure: local change persists, sync retried later.
+   *
+   * This preserves the existing local-first pattern so tag removal
+   * works offline. The server call is what records `removed_tags`
+   * for AI tag rejection — when offline, AI tag removal is only
+   * locally effective until the server is reachable.
+   */
+  async removeTag(gleamId: string, tag: string): Promise<void> {
+    // 1. Local-first: update local repo immediately (optimistic)
+    const gleam = await this.repository.getById(gleamId)
+    if (gleam) {
+      const next = gleam.tags.filter((t) => t !== tag)
+      await this.repository.updateDerivedFields(gleamId, { tags: next })
+    }
+
+    // 2. Best-effort server sync — records removed_tags on the backend.
+    //    On failure, local change persists; server sync retried later.
+    try {
+      await this.serverClient.removeTag(gleamId, tag)
+    } catch {
+      console.debug('[gleam] Server removeTag failed, local only:', gleamId)
+    }
+  }
+
+  /** Requests regeneration of a semantic artifact. Server-only. */
+  async regenerateArtifact(gleamId: string, artifact: ArtifactType): Promise<void> {
+    await this.serverClient.regenerateArtifact(gleamId, artifact)
+  }
+
+  /**
+   * Fetches relations for a single Gleam.
+   * Catches server errors and returns [] (relations section hidden).
+   * ServerClient.getGleamRelations throws on error; SyncService
+   * normalizes to [] so callers never see exceptions.
+   */
+  async getGleamRelations(gleamId: string): Promise<GleamRelation[]> {
+    try {
+      return await this.serverClient.getGleamRelations(gleamId)
+    } catch {
+      return []
     }
   }
 

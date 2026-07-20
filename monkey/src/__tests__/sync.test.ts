@@ -8,6 +8,11 @@ import type {
 } from '../infra/server-client'
 import type { IRepository, ILocalCache } from '../domain/repository'
 import type { Gleam } from '../domain/gleam'
+import type {
+  GleamIntelligence,
+  GleamRelation,
+  IntelligenceConfigView,
+} from '../domain/intelligence'
 
 // ── Mock helpers ───────────────────────────────────────
 
@@ -20,6 +25,21 @@ function makeGleam(overrides: Partial<Gleam> = {}): Gleam {
     tags: [],
     revisitCount: 0,
     lastRevisitedAt: '',
+    ...overrides,
+  }
+}
+
+function makeIntelligence(overrides: Partial<GleamIntelligence> = {}): GleamIntelligence {
+  return { summary: null, aiTags: [], ...overrides }
+}
+
+function makeRelation(overrides: Partial<GleamRelation> = {}): GleamRelation {
+  return {
+    id: 'rel-001',
+    targetGleam: { id: 'g2', thought: 'Related.', createdAt: '2026-07-14T12:00:00.000Z' },
+    relationType: 'semantic_proximity',
+    strength: 0.87,
+    origin: 'ai',
     ...overrides,
   }
 }
@@ -63,12 +83,7 @@ function createMockServerClient(overrides: Partial<ServerClient> = {}): ServerCl
   return {
     ping: mock(() => Promise.resolve(true)),
     appendGleams: mock(() =>
-      Promise.resolve<AppendResult>({
-        accepted: 0,
-        skipped: 0,
-        rejected: 0,
-        errors: [],
-      }),
+      Promise.resolve<AppendResult>({ accepted: 0, skipped: 0, rejected: 0, errors: [] }),
     ),
     search: mock(() => Promise.resolve<SearchResult>({ total: 0, items: [] })),
     getTimeline: mock(() =>
@@ -76,6 +91,14 @@ function createMockServerClient(overrides: Partial<ServerClient> = {}): ServerCl
     ),
     updateDerivedFields: mock(() => Promise.resolve(true)),
     renameTag: mock(() => Promise.resolve(0)),
+    getIntelligenceConfig: mock(() => Promise.resolve<IntelligenceConfigView | null>(null)),
+    configureProvider: mock(() =>
+      Promise.resolve({ provider: 'openai', model: 'gpt-4o-mini', success: true }),
+    ),
+    removeProvider: mock(() => Promise.resolve(true)),
+    removeTag: mock(() => Promise.resolve(true)),
+    regenerateArtifact: mock(() => Promise.resolve(true)),
+    getGleamRelations: mock(() => Promise.resolve<GleamRelation[]>([])),
     ...overrides,
   } as unknown as ServerClient
 }
@@ -236,7 +259,7 @@ describe('SyncService', () => {
     serverClient = createMockServerClient({
       getTimeline: mock(() =>
         Promise.resolve<TimelineResult>({
-          items: [g1],
+          items: [{ gleam: g1, intelligence: makeIntelligence() }],
           total: 1,
           hasMore: false,
         }),
@@ -247,10 +270,12 @@ describe('SyncService', () => {
     const result = await sync.getTimeline()
     expect(result.source).toBe('remote')
     expect(result.items).toHaveLength(1)
+    expect(result.items[0].gleam.id).toBe('g1')
+    expect(result.items[0].intelligence.summary).toBeNull()
     expect(sync.getState().status).toBe('connected')
   })
 
-  test('getTimeline falls back to local on server failure', async () => {
+  test('getTimeline falls back to local on server failure, wrapping with default intelligence', async () => {
     const g1 = makeGleam({ id: 'g1', createdAt: '2026-07-01T10:00:00.000Z' })
     const g2 = makeGleam({ id: 'g2', createdAt: '2026-07-15T10:00:00.000Z' })
     repo = createMockRepo([g1, g2])
@@ -263,8 +288,11 @@ describe('SyncService', () => {
     expect(result.source).toBe('local')
     expect(result.items).toHaveLength(2)
     // Should be sorted by createdAt descending
-    expect(result.items[0].id).toBe('g2')
-    expect(result.items[1].id).toBe('g1')
+    expect(result.items[0].gleam.id).toBe('g2')
+    expect(result.items[1].gleam.id).toBe('g1')
+    // Default intelligence should be applied
+    expect(result.items[0].intelligence.summary).toBeNull()
+    expect(result.items[0].intelligence.aiTags).toEqual([])
     expect(sync.getState().status).toBe('disconnected')
   })
 
@@ -276,7 +304,13 @@ describe('SyncService', () => {
       search: mock(() =>
         Promise.resolve<SearchResult>({
           total: 1,
-          items: [{ gleam: g1, score: 1, highlight: '**match**' }],
+          items: [
+            {
+              item: { gleam: g1, intelligence: makeIntelligence() },
+              score: 1,
+              highlight: '**match**',
+            },
+          ],
         }),
       ),
     })
@@ -285,10 +319,11 @@ describe('SyncService', () => {
     const result = await sync.search('match')
     expect(result.source).toBe('remote')
     expect(result.total).toBe(1)
+    expect(result.items[0].item.gleam.id).toBe('g1')
     expect(result.items[0].highlight).toBe('**match**')
   })
 
-  test('search falls back to local on server failure', async () => {
+  test('search falls back to local on server failure, wrapping with default intelligence', async () => {
     const g1 = makeGleam({ id: 'g1', thought: 'React is great' })
     const g2 = makeGleam({ id: 'g2', thought: 'Vue is also great' })
     repo = createMockRepo([g1, g2])
@@ -300,7 +335,8 @@ describe('SyncService', () => {
     const result = await sync.search('React')
     expect(result.source).toBe('local')
     expect(result.total).toBe(1)
-    expect(result.items[0].gleam.id).toBe('g1')
+    expect(result.items[0].item.gleam.id).toBe('g1')
+    expect(result.items[0].item.intelligence.summary).toBeNull()
     expect(result.items[0].highlight).toBeNull() // local search has no highlights
   })
 
@@ -352,6 +388,93 @@ describe('SyncService', () => {
     expect(local?.tags).toContain('new-tag')
     expect(local?.tags).not.toContain('old-tag')
     expect(renameMock).toHaveBeenCalledWith('old-tag', 'new-tag')
+  })
+
+  // ── removeTag (local-first with best-effort server sync) ──
+
+  test('removeTag updates locally first, then calls server removeTag', async () => {
+    const g1 = makeGleam({ id: 'g1', tags: ['react', 'hooks'] })
+    repo = createMockRepo([g1])
+    const removeTagMock = mock(() => Promise.resolve(true))
+    serverClient = createMockServerClient({ removeTag: removeTagMock })
+    sync = new SyncService(repo, serverClient)
+
+    await sync.removeTag('g1', 'react')
+
+    // Local should be updated immediately (react removed)
+    const local = await repo.getById('g1')
+    expect(local?.tags).toEqual(['hooks'])
+    // Server should also be called
+    expect(removeTagMock).toHaveBeenCalledWith('g1', 'react')
+  })
+
+  test('removeTag persists local change on server failure', async () => {
+    const g1 = makeGleam({ id: 'g1', tags: ['react', 'hooks'] })
+    repo = createMockRepo([g1])
+    serverClient = createMockServerClient({
+      removeTag: mock(() => Promise.reject(new Error('Server down'))),
+    })
+    sync = new SyncService(repo, serverClient)
+
+    // Should NOT throw — server failure is swallowed
+    await sync.removeTag('g1', 'react')
+
+    // Local change should still persist
+    const local = await repo.getById('g1')
+    expect(local?.tags).toEqual(['hooks'])
+  })
+
+  // ── getGleamRelations ──
+
+  test('getGleamRelations returns parsed relations on success', async () => {
+    const rel = makeRelation()
+    serverClient = createMockServerClient({
+      getGleamRelations: mock(() => Promise.resolve<GleamRelation[]>([rel])),
+    })
+    sync = new SyncService(repo, serverClient)
+
+    const relations = await sync.getGleamRelations('g1')
+    expect(relations).toHaveLength(1)
+    expect(relations[0].id).toBe('rel-001')
+    expect(relations[0].targetGleam.id).toBe('g2')
+  })
+
+  test('getGleamRelations returns [] on server error', async () => {
+    serverClient = createMockServerClient({
+      getGleamRelations: mock(() => Promise.reject(new Error('Server down'))),
+    })
+    sync = new SyncService(repo, serverClient)
+
+    const relations = await sync.getGleamRelations('g1')
+    expect(relations).toEqual([])
+  })
+
+  // ── Intelligence config methods ──
+
+  test('getIntelligenceConfig returns config on success', async () => {
+    const config: IntelligenceConfigView = {
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      hasApiKey: true,
+    }
+    serverClient = createMockServerClient({
+      getIntelligenceConfig: mock(() => Promise.resolve<IntelligenceConfigView | null>(config)),
+    })
+    sync = new SyncService(repo, serverClient)
+
+    const result = await sync.getIntelligenceConfig()
+    expect(result).not.toBeNull()
+    expect(result!.provider).toBe('openai')
+  })
+
+  test('getIntelligenceConfig returns null on server error', async () => {
+    serverClient = createMockServerClient({
+      getIntelligenceConfig: mock(() => Promise.reject(new Error('Server down'))),
+    })
+    sync = new SyncService(repo, serverClient)
+
+    const result = await sync.getIntelligenceConfig()
+    expect(result).toBeNull()
   })
 
   // ── onGleamCaptured ──

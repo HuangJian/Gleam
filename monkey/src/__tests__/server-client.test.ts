@@ -138,7 +138,7 @@ describe('ServerClient', () => {
     expect(result.errors[0].message).toBe('Invalid UUID')
   })
 
-  test('search returns gleams with highlights', async () => {
+  test('search parses intelligence from wire hit.gleam into SearchHit.item', async () => {
     setMockResponse(200, {
       data: {
         search: {
@@ -153,6 +153,8 @@ describe('ServerClient', () => {
                 tags: ['react'],
                 revisitCount: 0,
                 lastRevisitedAt: null,
+                summary: 'Hooks let function components manage state.',
+                aiTags: ['react', 'hooks'],
               },
               score: 1,
               highlight: '**React** hooks are powerful',
@@ -164,13 +166,17 @@ describe('ServerClient', () => {
 
     const result = await client.search('React')
     expect(result.total).toBe(1)
-    expect(result.items[0].gleam.id).toBe('g1')
-    expect(result.items[0].gleam.source.type).toBe('url') // lowercase
-    expect(result.items[0].gleam.lastRevisitedAt).toBe('') // null → ''
+    expect(result.items[0].item.gleam.id).toBe('g1')
+    expect(result.items[0].item.gleam.source.type).toBe('url') // lowercase
+    expect(result.items[0].item.gleam.lastRevisitedAt).toBe('') // null → ''
+    expect(result.items[0].item.intelligence.summary).toBe(
+      'Hooks let function components manage state.',
+    )
+    expect(result.items[0].item.intelligence.aiTags).toEqual(['react', 'hooks'])
     expect(result.items[0].highlight).toContain('**React**')
   })
 
-  test('getTimeline returns gleams sorted by createdAt', async () => {
+  test('getTimeline parses intelligence into GleamWithIntelligence', async () => {
     setMockResponse(200, {
       data: {
         timeline: {
@@ -183,6 +189,8 @@ describe('ServerClient', () => {
               tags: [],
               revisitCount: 0,
               lastRevisitedAt: null,
+              summary: 'A summary of the first thought.',
+              aiTags: ['book'],
             },
           ],
           total: 1,
@@ -193,7 +201,9 @@ describe('ServerClient', () => {
 
     const result = await client.getTimeline({ limit: 10 })
     expect(result.total).toBe(1)
-    expect(result.items[0].source.type).toBe('book') // lowercase
+    expect(result.items[0].gleam.source.type).toBe('book') // lowercase
+    expect(result.items[0].intelligence.summary).toBe('A summary of the first thought.')
+    expect(result.items[0].intelligence.aiTags).toEqual(['book'])
     expect(result.hasMore).toBe(false)
   })
 
@@ -251,5 +261,176 @@ describe('ServerClient', () => {
     await client.appendGleams([gleam])
     const body = JSON.parse(lastCall!.data!)
     expect(body.variables.gleams[0].source.media.kind).toBe('IMAGE') // uppercase
+  })
+
+  // ── Intelligence method tests ──
+
+  test('getIntelligenceConfig returns config view', async () => {
+    setMockResponse(200, {
+      data: { intelligenceConfig: { provider: 'openai', model: 'gpt-4o-mini', hasApiKey: true } },
+    })
+
+    const config = await client.getIntelligenceConfig()
+    expect(config).not.toBeNull()
+    expect(config!.provider).toBe('openai')
+    expect(config!.model).toBe('gpt-4o-mini')
+    expect(config!.hasApiKey).toBe(true)
+  })
+
+  test('getIntelligenceConfig returns null when not configured', async () => {
+    setMockResponse(200, {
+      data: { intelligenceConfig: null },
+    })
+
+    const config = await client.getIntelligenceConfig()
+    expect(config).toBeNull()
+  })
+
+  test('configureProvider sends correct mutation', async () => {
+    setMockResponse(200, {
+      data: { configureProvider: { provider: 'openai', model: 'gpt-4o-mini', success: true } },
+    })
+
+    const result = await client.configureProvider('openai', 'gpt-4o-mini', 'sk-xxx')
+    expect(result.provider).toBe('openai')
+    expect(result.model).toBe('gpt-4o-mini')
+    expect(result.success).toBe(true)
+
+    const body = JSON.parse(lastCall!.data!)
+    expect(body.query).toContain('configureProvider')
+    expect(body.variables.provider).toBe('openai')
+    expect(body.variables.model).toBe('gpt-4o-mini')
+    expect(body.variables.apiKey).toBe('sk-xxx')
+  })
+
+  test('removeProvider sends correct mutation', async () => {
+    setMockResponse(200, {
+      data: { removeProvider: { success: true } },
+    })
+
+    const success = await client.removeProvider()
+    expect(success).toBe(true)
+
+    const body = JSON.parse(lastCall!.data!)
+    expect(body.query).toContain('removeProvider')
+  })
+
+  test('removeTag sends correct mutation with gleamId and tag', async () => {
+    setMockResponse(200, {
+      data: { removeTag: { gleamId: 'g1', success: true } },
+    })
+
+    const success = await client.removeTag('g1', 'react')
+    expect(success).toBe(true)
+
+    const body = JSON.parse(lastCall!.data!)
+    expect(body.variables.gleamId).toBe('g1')
+    expect(body.variables.tag).toBe('react')
+  })
+
+  test('regenerateArtifact sends correct mutation with artifact enum', async () => {
+    setMockResponse(200, {
+      data: { regenerateArtifact: { gleamId: 'g1', artifact: 'SUMMARY', success: true } },
+    })
+
+    const success = await client.regenerateArtifact('g1', 'SUMMARY')
+    expect(success).toBe(true)
+
+    const body = JSON.parse(lastCall!.data!)
+    expect(body.variables.gleamId).toBe('g1')
+    expect(body.variables.artifact).toBe('SUMMARY')
+  })
+
+  test('getGleamRelations parses nested targetGleam correctly', async () => {
+    setMockResponse(200, {
+      data: {
+        gleamRelations: [
+          {
+            id: 'rel-001',
+            targetGleam: {
+              id: 'g2',
+              thought: 'A related thought.',
+              createdAt: '2026-07-14T12:00:00.000Z',
+            },
+            relationType: 'semantic_proximity',
+            strength: 0.87,
+            origin: 'AI',
+          },
+        ],
+      },
+    })
+
+    const relations = await client.getGleamRelations('g1')
+    expect(relations).toHaveLength(1)
+    expect(relations[0].id).toBe('rel-001')
+    expect(relations[0].targetGleam.id).toBe('g2')
+    expect(relations[0].targetGleam.thought).toBe('A related thought.')
+    expect(relations[0].relationType).toBe('semantic_proximity')
+    expect(relations[0].strength).toBe(0.87)
+    expect(relations[0].origin).toBe('ai') // lowercase
+  })
+
+  test('getGleamRelations converts origin from USER to user', async () => {
+    setMockResponse(200, {
+      data: {
+        gleamRelations: [
+          {
+            id: 'rel-002',
+            targetGleam: {
+              id: 'g3',
+              thought: 'User relation.',
+              createdAt: '2026-07-14T12:00:00.000Z',
+            },
+            relationType: 'manual_link',
+            strength: null,
+            origin: 'USER',
+          },
+        ],
+      },
+    })
+
+    const relations = await client.getGleamRelations('g1')
+    expect(relations[0].origin).toBe('user')
+    expect(relations[0].strength).toBeNull()
+  })
+
+  test('getGleamRelations filters orphaned relations (targetGleam is null)', async () => {
+    setMockResponse(200, {
+      data: {
+        gleamRelations: [
+          {
+            id: 'rel-001',
+            targetGleam: null,
+            relationType: 'semantic_proximity',
+            strength: 0.5,
+            origin: 'AI',
+          },
+          {
+            id: 'rel-002',
+            targetGleam: {
+              id: 'g2',
+              thought: 'Valid relation.',
+              createdAt: '2026-07-14T12:00:00.000Z',
+            },
+            relationType: 'semantic_proximity',
+            strength: 0.8,
+            origin: 'AI',
+          },
+        ],
+      },
+    })
+
+    const relations = await client.getGleamRelations('g1')
+    expect(relations).toHaveLength(1)
+    expect(relations[0].id).toBe('rel-002')
+  })
+
+  test('getGleamRelations handles empty relations', async () => {
+    setMockResponse(200, {
+      data: { gleamRelations: [] },
+    })
+
+    const relations = await client.getGleamRelations('g1')
+    expect(relations).toEqual([])
   })
 })

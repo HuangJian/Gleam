@@ -1,8 +1,8 @@
-import { Gleam } from '../domain/gleam'
+import type { GleamWithIntelligence } from '../domain/intelligence'
 
 export interface TimelineGroup {
   dateLabel: string // e.g., "2026-07-12"
-  gleams: Gleam[]
+  gleams: GleamWithIntelligence[]
 }
 
 /**
@@ -12,23 +12,23 @@ export interface TimelineGroup {
  * This is a pure utility — the caller is responsible for fetching gleams
  * (e.g., via SyncService.getTimeline or SyncService.search).
  */
-export function groupByDate(gleams: Gleam[]): TimelineGroup[] {
-  const groupsMap: Record<string, Gleam[]> = {}
+export function groupByDate(items: GleamWithIntelligence[]): TimelineGroup[] {
+  const groupsMap: Record<string, GleamWithIntelligence[]> = {}
 
-  for (const gleam of gleams) {
-    const date = new Date(gleam.createdAt)
+  for (const item of items) {
+    const date = new Date(item.gleam.createdAt)
     const dateLabel = formatDateLabel(date)
     if (!groupsMap[dateLabel]) {
       groupsMap[dateLabel] = []
     }
-    groupsMap[dateLabel].push(gleam)
+    groupsMap[dateLabel].push(item)
   }
 
   return Object.entries(groupsMap)
-    .map(([dateLabel, items]) => ({
+    .map(([dateLabel, groupItems]) => ({
       dateLabel,
-      gleams: items.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      gleams: groupItems.sort(
+        (a, b) => new Date(b.gleam.createdAt).getTime() - new Date(a.gleam.createdAt).getTime(),
       ),
     }))
     .sort((a, b) => {

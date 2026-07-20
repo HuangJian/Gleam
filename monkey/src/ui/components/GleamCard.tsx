@@ -1,5 +1,6 @@
 import styled from '@emotion/styled'
 import { Gleam } from '../../domain/gleam'
+import type { GleamIntelligence } from '../../domain/intelligence'
 import { theme } from '../theme'
 import { MarkdownPreview } from './MarkdownPreview'
 import { MediaPreview } from './MediaPreview'
@@ -8,6 +9,7 @@ import { TagCount } from '../../services/tag'
 
 interface GleamCardProps {
   gleam: Gleam
+  intelligence?: GleamIntelligence
   onRevisit: (id: string) => void
   onClick?: (gleam: Gleam) => void
   selected?: boolean
@@ -17,6 +19,7 @@ interface GleamCardProps {
 
 export function GleamCard({
   gleam,
+  intelligence,
   onRevisit,
   onClick,
   selected = false,
@@ -38,6 +41,11 @@ export function GleamCard({
     .slice()
     .sort((a, b) => (countMap.get(b) ?? 0) - (countMap.get(a) ?? 0))
 
+  const aiTagSet = new Set(intelligence?.aiTags ?? [])
+  const isAITag = (tag: string) => aiTagSet.has(tag)
+
+  const summary = intelligence?.summary ?? null
+
   return (
     <Card $selected={selected} onClick={handleCardClick}>
       <CardHeader>
@@ -46,7 +54,12 @@ export function GleamCard({
           {sortedTags.length > 0 && (
             <TagChips>
               {sortedTags.map((tag) => (
-                <TagChip key={tag} title={`${tag} · 用于 ${countMap.get(tag) ?? 0} 条拾光`}>
+                <TagChip
+                  key={tag}
+                  $ai={isAITag(tag)}
+                  title={`${tag} · 用于 ${countMap.get(tag) ?? 0} 条拾光`}
+                >
+                  {isAITag(tag) && <span>✦</span>}
                   {tag}
                 </TagChip>
               ))}
@@ -69,6 +82,13 @@ export function GleamCard({
           <MarkdownPreview content={gleam.thought} compact />
         )}
       </ThoughtText>
+
+      {summary && (
+        <AISummaryText>
+          <AIPrefix>✦</AIPrefix>
+          {summary}
+        </AISummaryText>
+      )}
 
       {gleam.source.media && <MediaPreview media={gleam.source.media} compact />}
     </Card>
@@ -155,10 +175,14 @@ const TagChips = styled.div`
   min-width: 0;
 `
 
-const TagChip = styled.span`
+const TagChip = styled.span<{ $ai: boolean }>`
   flex-shrink: 0;
-  background: rgba(200, 180, 140, 0.15);
-  border: 1px solid ${theme.colors.border.light};
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: ${(p) => (p.$ai ? theme.colors.intelligence.tagBg : 'rgba(200, 180, 140, 0.15)')};
+  border: 1px ${(p) => (p.$ai ? 'dashed' : 'solid')}
+    ${(p) => (p.$ai ? theme.colors.intelligence.tagBorder : theme.colors.border.light)};
   border-radius: 10px;
   padding: 1px 8px;
   font-size: 11px;
@@ -174,4 +198,18 @@ const ThoughtText = styled.div`
   max-height: 4.8em;
   overflow-y: auto;
   overscroll-behavior: contain;
+`
+
+const AISummaryText = styled.div`
+  display: flex;
+  gap: 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: ${theme.colors.intelligence.summaryText};
+  font-style: italic;
+`
+
+const AIPrefix = styled.span`
+  color: ${theme.colors.intelligence.accent};
+  flex-shrink: 0;
 `

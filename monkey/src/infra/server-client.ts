@@ -1,4 +1,11 @@
 import type { Gleam, Source, MediaKind, SourceType } from '../domain/gleam'
+import type {
+  GleamIntelligence,
+  GleamRelation,
+  GleamWithIntelligence,
+  IntelligenceConfigView,
+  ArtifactType,
+} from '../domain/intelligence'
 
 // ── GM_xmlhttpRequest declaration ──────────────────────
 
@@ -28,7 +35,8 @@ export interface ServerConfig {
 }
 
 export interface SearchHit {
-  gleam: Gleam
+  /** The matched Gleam with Intelligence companion data. Renamed from `gleam` to avoid `h.gleam.gleam.id` double-nesting. */
+  item: GleamWithIntelligence
   score: number
   highlight: string | null
 }
@@ -39,7 +47,7 @@ export interface SearchResult {
 }
 
 export interface TimelineResult {
-  items: Gleam[]
+  items: GleamWithIntelligence[]
   total: number
   hasMore: boolean
 }
@@ -90,6 +98,8 @@ const SEARCH_QUERY = /* GraphQL */ `
           tags
           revisitCount
           lastRevisitedAt
+          summary
+          aiTags
         }
         score
         highlight
@@ -118,6 +128,8 @@ const TIMELINE_QUERY = /* GraphQL */ `
         tags
         revisitCount
         lastRevisitedAt
+        summary
+        aiTags
       }
       total
       hasMore
@@ -164,6 +176,69 @@ const RENAME_TAG_MUTATION = /* GraphQL */ `
   mutation RenameTag($oldTag: String!, $newTag: String!) {
     renameTag(input: { oldTag: $oldTag, newTag: $newTag }) {
       affectedCount
+    }
+  }
+`
+
+const GLEAM_RELATIONS_QUERY = /* GraphQL */ `
+  query GleamRelations($gleamId: ID!) {
+    gleamRelations(gleamId: $gleamId) {
+      id
+      targetGleam {
+        id
+        thought
+        createdAt
+      }
+      relationType
+      strength
+      origin
+    }
+  }
+`
+
+const INTELLIGENCE_CONFIG_QUERY = /* GraphQL */ `
+  query IntelligenceConfig {
+    intelligenceConfig {
+      provider
+      model
+      hasApiKey
+    }
+  }
+`
+
+const CONFIGURE_PROVIDER_MUTATION = /* GraphQL */ `
+  mutation ConfigureProvider($provider: String!, $model: String!, $apiKey: String!) {
+    configureProvider(input: { provider: $provider, model: $model, apiKey: $apiKey }) {
+      provider
+      model
+      success
+    }
+  }
+`
+
+const REMOVE_PROVIDER_MUTATION = /* GraphQL */ `
+  mutation RemoveProvider {
+    removeProvider {
+      success
+    }
+  }
+`
+
+const REMOVE_TAG_MUTATION = /* GraphQL */ `
+  mutation RemoveTag($gleamId: ID!, $tag: String!) {
+    removeTag(input: { gleamId: $gleamId, tag: $tag }) {
+      gleamId
+      success
+    }
+  }
+`
+
+const REGENERATE_ARTIFACT_MUTATION = /* GraphQL */ `
+  mutation RegenerateArtifact($gleamId: ID!, $artifact: ArtifactType!) {
+    regenerateArtifact(input: { gleamId: $gleamId, artifact: $artifact }) {
+      gleamId
+      artifact
+      success
     }
   }
 `
@@ -228,6 +303,40 @@ function fromGraphQLGleam(raw: Record<string, unknown>): Gleam {
   }
 }
 
+/** Parses Intelligence companion data from a GraphQL response. */
+function fromGraphQLIntelligence(raw: Record<string, unknown>): GleamIntelligence {
+  return {
+    summary: (raw.summary as string | null) ?? null,
+    aiTags: (raw.aiTags as string[]) ?? [],
+  }
+}
+
+/**
+ * Parses a single GleamRelation from a GraphQL response.
+ *
+ * Handles:
+ * - Nested targetGleam object (NOT a flat ID).
+ * - origin: 'AI'/'USER' (wire) → 'ai'/'user' (client).
+ * - targetGleam: null (orphaned relation) → filtered by caller.
+ * - strength: nullable.
+ */
+function fromGraphQLRelation(raw: Record<string, unknown>): GleamRelation | null {
+  const targetGleam = raw.targetGleam as Record<string, unknown> | null
+  if (!targetGleam) return null // orphaned — filtered by caller
+
+  return {
+    id: raw.id as string,
+    targetGleam: {
+      id: targetGleam.id as string,
+      thought: targetGleam.thought as string,
+      createdAt: targetGleam.createdAt as string,
+    },
+    relationType: raw.relationType as string,
+    strength: (raw.strength as number | null) ?? null,
+    origin: (raw.origin as string).toLowerCase() as 'ai' | 'user',
+  }
+}
+
 // ── ServerClient ───────────────────────────────────────
 
 /**
@@ -289,7 +398,10 @@ export class ServerClient {
     return {
       total: data.total,
       items: (data.items ?? []).map((hit) => ({
-        gleam: fromGraphQLGleam(hit.gleam),
+        item: {
+          gleam: fromGraphQLGleam(hit.gleam),
+          intelligence: fromGraphQLIntelligence(hit.gleam),
+        },
         score: hit.score,
         highlight: hit.highlight ?? null,
       })),
@@ -307,7 +419,10 @@ export class ServerClient {
       | undefined
     if (!data) throw new Error('Missing timeline in response')
     return {
-      items: (data.items ?? []).map((g) => fromGraphQLGleam(g)),
+      items: (data.items ?? []).map((g) => ({
+        gleam: fromGraphQLGleam(g),
+        intelligence: fromGraphQLIntelligence(g),
+      })),
       total: data.total,
       hasMore: data.hasMore,
     }
@@ -334,6 +449,84 @@ export class ServerClient {
     const data = resp.data?.renameTag as { affectedCount: number } | undefined
     if (!data) throw new Error('Missing renameTag in response')
     return data.affectedCount
+  }
+
+  // ── Intelligence methods ────────────────────────────
+
+  /** Fetches the current provider configuration. */
+  async getIntelligenceConfig(): Promise<IntelligenceConfigView | null> {
+    const resp = await this.request(INTELLIGENCE_CONFIG_QUERY, {})
+    const data = resp.data?.intelligenceConfig as
+      | { provider: string; model: string; hasApiKey: boolean }
+      | null
+      | undefined
+    if (!data) return null
+    return {
+      provider: data.provider,
+      model: data.model,
+      hasApiKey: data.hasApiKey,
+    }
+  }
+
+  /**
+   * Configures the LLM provider. Validates before persisting.
+   * Throws on validation failure or missing GLEAM_BACKEND_SECRET.
+   */
+  async configureProvider(
+    provider: string,
+    model: string,
+    apiKey: string,
+  ): Promise<{ provider: string; model: string; success: boolean }> {
+    const resp = await this.request(CONFIGURE_PROVIDER_MUTATION, {
+      provider,
+      model,
+      apiKey,
+    })
+    const data = resp.data?.configureProvider as
+      | { provider: string; model: string; success: boolean }
+      | undefined
+    if (!data) throw new Error('Missing configureProvider in response')
+    return data
+  }
+
+  /** Removes the provider configuration. */
+  async removeProvider(): Promise<boolean> {
+    const resp = await this.request(REMOVE_PROVIDER_MUTATION, {})
+    const data = resp.data?.removeProvider as { success: boolean } | undefined
+    if (!data) throw new Error('Missing removeProvider in response')
+    return data.success
+  }
+
+  /** Removes a tag (user or AI) and records it in removed_tags. */
+  async removeTag(gleamId: string, tag: string): Promise<boolean> {
+    const resp = await this.request(REMOVE_TAG_MUTATION, { gleamId, tag })
+    const data = resp.data?.removeTag as { gleamId: string; success: boolean } | undefined
+    if (!data) throw new Error('Missing removeTag in response')
+    return data.success
+  }
+
+  /** Requests regeneration of a semantic artifact. */
+  async regenerateArtifact(gleamId: string, artifact: ArtifactType): Promise<boolean> {
+    const resp = await this.request(REGENERATE_ARTIFACT_MUTATION, { gleamId, artifact })
+    const data = resp.data?.regenerateArtifact as
+      | { gleamId: string; artifact: string; success: boolean }
+      | undefined
+    if (!data) throw new Error('Missing regenerateArtifact in response')
+    return data.success
+  }
+
+  /**
+   * Fetches relations for a single Gleam.
+   * Throws on network/HTTP errors (consistent with other ServerClient
+   * methods). SyncService catches and normalizes to [].
+   * Filters orphaned relations (targetGleam === null) via
+   * `fromGraphQLRelation` returning null + `.filter` here.
+   */
+  async getGleamRelations(gleamId: string): Promise<GleamRelation[]> {
+    const resp = await this.request(GLEAM_RELATIONS_QUERY, { gleamId })
+    const data = resp.data?.gleamRelations as Record<string, unknown>[] | undefined
+    if (!data) throw new Error('Missing gleamRelations in response')
+    return data.map((r) => fromGraphQLRelation(r)).filter((r): r is GleamRelation => r !== null)
   }
 
   // ── Internal: GM_xmlhttpRequest wrapper ──────────────

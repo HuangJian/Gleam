@@ -190,14 +190,12 @@ GleamRelationType.implement({
     id: t.exposeID('id'),
     targetGleam: t.field({
       type: GleamType,
+      nullable: true,
       resolve: async (parent, _args, ctx) => {
         const gleam = await ctx.repository.getGleamById(parent.targetGleamId)
-        if (!gleam) {
-          // Orphaned relation (target deleted in future versions).
-          // Return a placeholder to avoid breaking the GraphQL response.
-          throw new Error(`Relation target not found: ${parent.targetGleamId}`)
-        }
-        return gleam as unknown as GraphQLGleam
+        // Orphaned relation (target deleted) — return null instead of throwing.
+        // The client filters out relations where targetGleam is null.
+        return gleam as unknown as GraphQLGleam | null
       },
     }),
     relationType: t.exposeString('relationType'),
@@ -478,6 +476,16 @@ builder.queryType({
       nullable: true,
       resolve: async (_root, _args, ctx) => {
         return ctx.intelligenceRepository.getIntelligenceConfigView()
+      },
+    }),
+
+    gleamRelations: t.field({
+      type: [GleamRelationType],
+      args: {
+        gleamId: t.arg({ type: 'ID', required: true }),
+      },
+      resolve: async (_root, args, ctx) => {
+        return ctx.intelligenceRepository.getRelations(args.gleamId)
       },
     }),
   }),

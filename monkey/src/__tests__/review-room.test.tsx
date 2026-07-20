@@ -3,7 +3,8 @@ import { render, fireEvent, cleanup, waitFor } from '@testing-library/preact'
 import { ReviewRoom } from '../ui/components/ReviewRoom'
 import { TimelineGroup } from '../services/timeline'
 import { TagCount } from '../services/tag'
-import { makeGleam } from './helpers'
+import { makeGleamWithIntelligence, makeRelation } from './helpers'
+import type { GleamRelation } from '../domain/intelligence'
 
 const mockSyncState = {
   status: 'disconnected' as const,
@@ -23,7 +24,8 @@ function minimalProps(overrides: Record<string, unknown> = {}) {
     onAddGleam: vi.fn(),
     viewingGleam: null,
     onOpenGleam: vi.fn(),
-    onCloseDetail: vi.fn(),
+    onGetRelations: vi.fn().mockResolvedValue([]) as (gleamId: string) => Promise<GleamRelation[]>,
+    onRegenerateArtifact: vi.fn().mockResolvedValue(undefined),
     tagCounts: [] as TagCount[],
     onAddTag: vi.fn().mockResolvedValue(undefined),
     onRemoveTag: vi.fn().mockResolvedValue(undefined),
@@ -79,8 +81,8 @@ describe('ReviewRoom', () => {
       {
         dateLabel: 'Today',
         gleams: [
-          makeGleam({ id: 'g1', thought: 'First insight.' }),
-          makeGleam({ id: 'g2', thought: 'Second insight.' }),
+          makeGleamWithIntelligence({ id: 'g1', thought: 'First insight.' }),
+          makeGleamWithIntelligence({ id: 'g2', thought: 'Second insight.' }),
         ],
       },
     ]
@@ -158,21 +160,25 @@ describe('ReviewRoom', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  test('clicking a gleam card calls onOpenGleam and onRevisitGleam', () => {
-    const gleam = makeGleam({ id: 'card-42', thought: 'Clickable.' })
-    const groups: TimelineGroup[] = [{ dateLabel: 'Today', gleams: [gleam] }]
+  test('clicking a gleam card calls onOpenGleam only (no double-count revisit)', () => {
+    const item = makeGleamWithIntelligence({ id: 'card-42', thought: 'Clickable.' })
+    const groups: TimelineGroup[] = [{ dateLabel: 'Today', gleams: [item] }]
     const onOpenGleam = vi.fn()
     const onRevisitGleam = vi.fn().mockResolvedValue(undefined)
     const { getByText } = render(
       <ReviewRoom {...minimalProps({ timelineGroups: groups, onOpenGleam, onRevisitGleam })} />,
     )
     fireEvent.click(getByText('Clickable.'))
-    expect(onOpenGleam).toHaveBeenCalledWith(gleam)
+    // handleCardClick should call onOpenGleam with the GleamWithIntelligence item
+    expect(onOpenGleam).toHaveBeenCalledWith(item)
+    // onRevisitGleam is called exactly once — by GleamCard's internal onRevisit handler,
+    // NOT by handleCardClick. This prevents the double-count bug (old code called it twice).
+    expect(onRevisitGleam).toHaveBeenCalledTimes(1)
     expect(onRevisitGleam).toHaveBeenCalledWith('card-42')
   })
 
-  test('shows the detail overlay when viewingGleam is set', () => {
-    const gleam = makeGleam({
+  test('shows the detail view when viewingGleam is set', () => {
+    const item = makeGleamWithIntelligence({
       thought: 'Deep thought.',
       source: {
         type: 'url',
@@ -181,7 +187,7 @@ describe('ReviewRoom', () => {
         excerpt: 'Context quote.',
       },
     })
-    const { getByText } = render(<ReviewRoom {...minimalProps({ viewingGleam: gleam })} />)
+    const { getByText } = render(<ReviewRoom {...minimalProps({ viewingGleam: item })} />)
     // Thought is rendered via MarkdownPreview in the detail card.
     expect(getByText('Deep thought.')).toBeTruthy()
     // Source link is still shown in the detail view (only the card hides it).
@@ -189,20 +195,20 @@ describe('ReviewRoom', () => {
   })
 
   test('renders the tag editor with existing tags when a gleam is selected', () => {
-    const gleam = makeGleam({ thought: 'Tagged.', tags: ['react', 'hooks'] })
-    const groups: TimelineGroup[] = [{ dateLabel: 'Today', gleams: [gleam] }]
+    const item = makeGleamWithIntelligence({ thought: 'Tagged.', tags: ['react', 'hooks'] })
+    const groups: TimelineGroup[] = [{ dateLabel: 'Today', gleams: [item] }]
     const { getAllByText } = render(
-      <ReviewRoom {...minimalProps({ viewingGleam: gleam, timelineGroups: groups })} />,
+      <ReviewRoom {...minimalProps({ viewingGleam: item, timelineGroups: groups })} />,
     )
     expect(getAllByText('react').length).toBeGreaterThan(0)
     expect(getAllByText('hooks').length).toBeGreaterThan(0)
   })
 
   test('calls onAddTag when a new tag is typed and submitted', async () => {
-    const gleam = makeGleam({ thought: 'Tagged.', tags: ['react'] })
+    const item = makeGleamWithIntelligence({ thought: 'Tagged.', tags: ['react'] })
     const onAddTag = vi.fn().mockResolvedValue(undefined)
     const { getByPlaceholderText, getByTitle } = render(
-      <ReviewRoom {...minimalProps({ viewingGleam: gleam, onAddTag })} />,
+      <ReviewRoom {...minimalProps({ viewingGleam: item, onAddTag })} />,
     )
     const input = getByPlaceholderText('+ 标签')
     fireEvent.input(input, { target: { value: 'css' } })
@@ -211,13 +217,11 @@ describe('ReviewRoom', () => {
   })
 
   test('calls onRemoveTag when a header tag chip is clicked', () => {
-    const gleam = makeGleam({ thought: 'Tagged.', tags: ['react', 'hooks'] })
-    const groups: TimelineGroup[] = [{ dateLabel: 'Today', gleams: [gleam] }]
+    const item = makeGleamWithIntelligence({ thought: 'Tagged.', tags: ['react', 'hooks'] })
+    const groups: TimelineGroup[] = [{ dateLabel: 'Today', gleams: [item] }]
     const onRemoveTag = vi.fn().mockResolvedValue(undefined)
     const { getAllByText } = render(
-      <ReviewRoom
-        {...minimalProps({ viewingGleam: gleam, timelineGroups: groups, onRemoveTag })}
-      />,
+      <ReviewRoom {...minimalProps({ viewingGleam: item, timelineGroups: groups, onRemoveTag })} />,
     )
     // The detail header chip is the one wired to onRemoveTag; click it.
     const chips = getAllByText('react')
@@ -226,13 +230,13 @@ describe('ReviewRoom', () => {
   })
 
   test('shows tag counts in suggestions for tags not on the gleam', async () => {
-    const gleam = makeGleam({ thought: 'Tagged.', tags: ['react'] })
+    const item = makeGleamWithIntelligence({ thought: 'Tagged.', tags: ['react'] })
     const tagCounts: TagCount[] = [
       { tag: 'hooks', count: 4 },
       { tag: 'css', count: 2 },
     ]
     const { getByPlaceholderText, getAllByText } = render(
-      <ReviewRoom {...minimalProps({ viewingGleam: gleam, tagCounts })} />,
+      <ReviewRoom {...minimalProps({ viewingGleam: item, tagCounts })} />,
     )
     // Typing a draft that matches a tag not present in the hot row (css) shows
     // it as an inline suggestion chip with its usage count.
@@ -244,14 +248,14 @@ describe('ReviewRoom', () => {
   })
 
   test('shows hot tags in the bottom row, clickable to add', () => {
-    const gleam = makeGleam({ thought: 'Tagged.', tags: ['react'] })
+    const item = makeGleamWithIntelligence({ thought: 'Tagged.', tags: ['react'] })
     const tagCounts: TagCount[] = [
       { tag: 'react', count: 5 },
       { tag: 'hooks', count: 2 },
     ]
     const onAddTag = vi.fn().mockResolvedValue(undefined)
     const { getByText } = render(
-      <ReviewRoom {...minimalProps({ viewingGleam: gleam, tagCounts, onAddTag })} />,
+      <ReviewRoom {...minimalProps({ viewingGleam: item, tagCounts, onAddTag })} />,
     )
     // Bottom row hot tag chip is rendered with its usage count.
     const chip = getByText('hooks')
@@ -259,5 +263,134 @@ describe('ReviewRoom', () => {
     expect(getByText('2')).toBeTruthy()
     fireEvent.click(chip)
     expect(onAddTag).toHaveBeenCalledWith('gleam-001', 'hooks')
+  })
+
+  // ── AI Summary Section ──
+
+  test('shows AI summary section when viewingGleam has intelligence.summary', () => {
+    const item = makeGleamWithIntelligence(
+      { thought: 'React is great.' },
+      { summary: 'Hooks let function components manage state.' },
+    )
+    const { getByText } = render(<ReviewRoom {...minimalProps({ viewingGleam: item })} />)
+    expect(getByText('AI 观察')).toBeTruthy()
+    expect(getByText('Hooks let function components manage state.')).toBeTruthy()
+  })
+
+  test('does not show AI summary section when intelligence.summary is null', () => {
+    const item = makeGleamWithIntelligence({ thought: 'No summary.' }, { summary: null })
+    const { queryByText } = render(<ReviewRoom {...minimalProps({ viewingGleam: item })} />)
+    expect(queryByText('AI 观察')).toBeNull()
+  })
+
+  // ── Relations Section ──
+
+  test('shows relations section when relations are fetched', async () => {
+    const item = makeGleamWithIntelligence({ id: 'g1', thought: 'Main thought.' })
+    const rel = makeRelation({
+      targetGleam: {
+        id: 'g2',
+        thought: 'Related thought here.',
+        createdAt: '2026-07-14T12:00:00.000Z',
+      },
+    })
+    const onGetRelations = vi.fn().mockResolvedValue([rel])
+    const { getByText } = render(
+      <ReviewRoom {...minimalProps({ viewingGleam: item, onGetRelations })} />,
+    )
+    await waitFor(() => expect(getByText('相关拾光')).toBeTruthy())
+    expect(getByText('Related thought here.')).toBeTruthy()
+  })
+
+  test('hides relations section when no relations exist', async () => {
+    const item = makeGleamWithIntelligence({ id: 'g1', thought: 'No relations.' })
+    const onGetRelations = vi.fn().mockResolvedValue([])
+    const { queryByText } = render(
+      <ReviewRoom {...minimalProps({ viewingGleam: item, onGetRelations })} />,
+    )
+    await waitFor(() => expect(queryByText('相关拾光')).toBeNull())
+  })
+
+  test('hides relations section on fetch error', async () => {
+    const item = makeGleamWithIntelligence({ id: 'g1', thought: 'Error case.' })
+    const onGetRelations = vi.fn().mockRejectedValue(new Error('Server down'))
+    const { queryByText } = render(
+      <ReviewRoom {...minimalProps({ viewingGleam: item, onGetRelations })} />,
+    )
+    await waitFor(() => expect(queryByText('相关拾光')).toBeNull())
+  })
+
+  test('clicking a relation navigates via onOpenGleam (no revisit)', async () => {
+    const target = makeGleamWithIntelligence({ id: 'g2', thought: 'Viewing this gleam.' })
+    const groups: TimelineGroup[] = [{ dateLabel: 'Today', gleams: [target] }]
+    const rel = makeRelation({
+      targetGleam: {
+        id: 'g2',
+        thought: 'Viewing this gleam.',
+        createdAt: '2026-07-14T12:00:00.000Z',
+      },
+    })
+    const onGetRelations = vi.fn().mockResolvedValue([rel])
+    const onOpenGleam = vi.fn()
+    const onRevisitGleam = vi.fn().mockResolvedValue(undefined)
+    const { getByText } = render(
+      <ReviewRoom
+        {...minimalProps({
+          viewingGleam: target,
+          timelineGroups: groups,
+          onGetRelations,
+          onOpenGleam,
+          onRevisitGleam,
+        })}
+      />,
+    )
+    await waitFor(() => expect(getByText('相关拾光')).toBeTruthy())
+    // Click the relation item button — go up from the section header to the
+    // section container, then find the first button (RelationItem).
+    const relationHeader = getByText('相关拾光')
+    const sectionContainer = relationHeader.parentElement
+    const relationButton = sectionContainer?.querySelector('button')
+    expect(relationButton).toBeTruthy()
+    fireEvent.click(relationButton!)
+    expect(onOpenGleam).toHaveBeenCalled()
+    // Should NOT call onRevisitGleam — relation navigation is discovery, not revisit
+    expect(onRevisitGleam).not.toHaveBeenCalled()
+  })
+
+  // ── Regeneration Controls ──
+
+  test('shows regeneration button next to AI summary section', () => {
+    const item = makeGleamWithIntelligence(
+      { thought: 'Summarized.' },
+      { summary: 'AI summary text.' },
+    )
+    const { getByTitle } = render(<ReviewRoom {...minimalProps({ viewingGleam: item })} />)
+    expect(getByTitle('重新生成摘要')).toBeTruthy()
+  })
+
+  test('clicking regenerate button calls onRegenerateArtifact', async () => {
+    const item = makeGleamWithIntelligence(
+      { thought: 'Summarized.' },
+      { summary: 'AI summary text.' },
+    )
+    const onRegenerateArtifact = vi.fn().mockResolvedValue(undefined)
+    const { getByTitle } = render(
+      <ReviewRoom {...minimalProps({ viewingGleam: item, onRegenerateArtifact })} />,
+    )
+    fireEvent.click(getByTitle('重新生成摘要'))
+    await waitFor(() => expect(onRegenerateArtifact).toHaveBeenCalledWith('gleam-001', 'SUMMARY'))
+  })
+
+  test('shows "已请求" after requesting regeneration', async () => {
+    const item = makeGleamWithIntelligence(
+      { thought: 'Summarized.' },
+      { summary: 'AI summary text.' },
+    )
+    const onRegenerateArtifact = vi.fn().mockResolvedValue(undefined)
+    const { getByText, getByTitle } = render(
+      <ReviewRoom {...minimalProps({ viewingGleam: item, onRegenerateArtifact })} />,
+    )
+    fireEvent.click(getByTitle('重新生成摘要'))
+    await waitFor(() => expect(getByText('已请求')).toBeTruthy())
   })
 })

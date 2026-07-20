@@ -1,7 +1,8 @@
-import { useState } from 'preact/hooks'
+import { useState, useEffect } from 'preact/hooks'
 import styled from '@emotion/styled'
 import { theme } from '../theme'
 import type { SyncState } from '../../services/sync'
+import type { IntelligenceConfigView } from '../../domain/intelligence'
 
 interface SettingsPanelProps {
   isOpen: boolean
@@ -11,6 +12,9 @@ interface SettingsPanelProps {
   onSaveUrl: (url: string) => void
   onTestConnection: () => Promise<boolean>
   onSyncNow: () => Promise<void>
+  onGetIntelligenceConfig: () => Promise<IntelligenceConfigView | null>
+  onConfigureProvider: (provider: string, model: string, apiKey: string) => Promise<void>
+  onRemoveProvider: () => Promise<void>
 }
 
 export function SettingsPanel({
@@ -21,10 +25,35 @@ export function SettingsPanel({
   onSaveUrl,
   onTestConnection,
   onSyncNow,
+  onGetIntelligenceConfig,
+  onConfigureProvider,
+  onRemoveProvider,
 }: SettingsPanelProps) {
   const [urlInput, setUrlInput] = useState(serverUrl)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<'idle' | 'success' | 'fail'>('idle')
+
+  // Intelligence config state
+  const [aiConfig, setAiConfig] = useState<IntelligenceConfigView | null>(null)
+  const [provider, setProvider] = useState('openai')
+  const [model, setModel] = useState('gpt-4o-mini')
+  const [apiKey, setApiKey] = useState('')
+  const [aiSaving, setAiSaving] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiRemoving, setAiRemoving] = useState(false)
+
+  // Fetch intelligence config when panel opens
+  useEffect(() => {
+    if (!isOpen) return
+    setAiError(null)
+    onGetIntelligenceConfig().then((config) => {
+      setAiConfig(config)
+      if (config) {
+        setProvider(config.provider)
+        setModel(config.model)
+      }
+    })
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -43,6 +72,41 @@ export function SettingsPanel({
 
   const handleSync = async () => {
     await onSyncNow()
+  }
+
+  const handleConfigureProvider = async () => {
+    setAiSaving(true)
+    setAiError(null)
+    try {
+      await onConfigureProvider(provider, model, apiKey)
+      // Refresh config
+      const config = await onGetIntelligenceConfig()
+      setAiConfig(config)
+      setApiKey('')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.includes('GLEAM_BACKEND_SECRET')) {
+        setAiError('服务端未配置加密密钥，请联系管理员设置 GLEAM_BACKEND_SECRET 环境变量。')
+      } else {
+        setAiError(msg)
+      }
+    } finally {
+      setAiSaving(false)
+    }
+  }
+
+  const handleRemoveProvider = async () => {
+    setAiRemoving(true)
+    setAiError(null)
+    try {
+      await onRemoveProvider()
+      setAiConfig(null)
+      setApiKey('')
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : '移除失败')
+    } finally {
+      setAiRemoving(false)
+    }
   }
 
   const statusColor =
@@ -128,6 +192,104 @@ export function SettingsPanel({
           </ActionButton>
         </Section>
 
+        {/* AI 观察者 Section */}
+        <Section>
+          <SectionLabel>AI 观察者</SectionLabel>
+
+          {aiConfig ? (
+            <>
+              <ConfigInfo>
+                <ConfigRow>
+                  <ConfigLabel>当前提供方:</ConfigLabel>
+                  <ConfigValue>{aiConfig.provider}</ConfigValue>
+                </ConfigRow>
+                <ConfigRow>
+                  <ConfigLabel>当前模型:</ConfigLabel>
+                  <ConfigValue>{aiConfig.model}</ConfigValue>
+                </ConfigRow>
+                <ConfigRow>
+                  <ConfigLabel>API Key:</ConfigLabel>
+                  <ConfigValue>{aiConfig.hasApiKey ? '已配置 ✓' : '未配置'}</ConfigValue>
+                </ConfigRow>
+              </ConfigInfo>
+
+              <PrivacyNotice>⚠ 修改模型或提供方需要重新输入 API Key。</PrivacyNotice>
+
+              <ProviderSelect
+                value={provider}
+                onChange={(e: Event) => setProvider((e.target as HTMLSelectElement).value)}
+              >
+                <option value="openai">openai</option>
+              </ProviderSelect>
+              <ModelInput
+                type="text"
+                placeholder="模型名称"
+                value={model}
+                onInput={(e: Event) => setModel((e.target as HTMLInputElement).value)}
+              />
+              <ApiKeyInput
+                type="password"
+                placeholder="需重新输入 API Key"
+                value={apiKey}
+                onInput={(e: Event) => setApiKey((e.target as HTMLInputElement).value)}
+              />
+              <ButtonRow>
+                <ActionButton
+                  onClick={handleConfigureProvider}
+                  disabled={aiSaving || !apiKey.trim()}
+                  title="更新配置"
+                >
+                  {aiSaving ? '验证中…' : '更新配置'}
+                </ActionButton>
+                <ActionButton onClick={handleRemoveProvider} disabled={aiRemoving} title="删除配置">
+                  {aiRemoving ? '删除中…' : '删除配置'}
+                </ActionButton>
+              </ButtonRow>
+            </>
+          ) : (
+            <>
+              <ConfigInfo>尚未配置 LLM 提供方。</ConfigInfo>
+              <ConfigInfo>
+                启用后，AI 将在后台自动为你的拾光生成摘要、标签，并发现语义关联。
+              </ConfigInfo>
+
+              <PrivacyNotice>
+                ⚠ 你的拾光内容（thought、source 等）将被发送到外部 LLM 服务进行语义分析。
+              </PrivacyNotice>
+
+              <ProviderSelect
+                value={provider}
+                onChange={(e: Event) => setProvider((e.target as HTMLSelectElement).value)}
+              >
+                <option value="openai">openai</option>
+              </ProviderSelect>
+              <ModelInput
+                type="text"
+                placeholder="模型名称"
+                value={model}
+                onInput={(e: Event) => setModel((e.target as HTMLInputElement).value)}
+              />
+              <ApiKeyInput
+                type="password"
+                placeholder="API Key"
+                value={apiKey}
+                onInput={(e: Event) => setApiKey((e.target as HTMLInputElement).value)}
+              />
+              <ButtonRow>
+                <ActionButton
+                  onClick={handleConfigureProvider}
+                  disabled={aiSaving || !apiKey.trim()}
+                  title="验证并保存"
+                >
+                  {aiSaving ? '验证中…' : '验证并保存'}
+                </ActionButton>
+              </ButtonRow>
+            </>
+          )}
+
+          {aiError && <ErrorText>{aiError}</ErrorText>}
+        </Section>
+
         <HelpText>
           配置服务端地址后，捕获的拾光会自动上传至服务器归档。服务端不可用时，拾光会保存在本地缓存，待恢复连接后自动同步。
         </HelpText>
@@ -170,7 +332,7 @@ const Panel = styled.div`
   box-shadow: ${theme.shadows.popover};
   width: 440px;
   max-width: 90vw;
-  max-height: 80vh;
+  max-height: 85vh;
   overflow-y: auto;
   padding: 24px;
   display: flex;
@@ -329,4 +491,95 @@ const HelpText = styled.p`
   margin: 0;
   padding-top: 8px;
   border-top: 1px solid ${theme.colors.border.card};
+`
+
+const ConfigInfo = styled.div`
+  font-size: 13px;
+  color: ${theme.colors.text.secondary};
+  line-height: 1.6;
+`
+
+const ConfigRow = styled.div`
+  display: flex;
+  gap: 8px;
+`
+
+const ConfigLabel = styled.span`
+  font-size: 13px;
+  color: ${theme.colors.text.muted};
+  flex-shrink: 0;
+`
+
+const ConfigValue = styled.span`
+  font-size: 13px;
+  color: ${theme.colors.text.primary};
+  font-weight: 500;
+`
+
+const PrivacyNotice = styled.div`
+  font-size: 12px;
+  color: ${theme.colors.text.warning};
+  background: rgba(218, 165, 80, 0.08);
+  border-radius: 6px;
+  padding: 6px 10px;
+  line-height: 1.5;
+`
+
+const ProviderSelect = styled.select`
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: ${theme.typography.fontFamily};
+  color: ${theme.colors.text.primary};
+  background: ${theme.colors.bg.input};
+  outline: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: ${theme.animations.transition};
+
+  &:focus {
+    border-color: ${theme.colors.border.focus};
+  }
+`
+
+const ModelInput = styled.input`
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: ${theme.typography.fontFamily};
+  color: ${theme.colors.text.primary};
+  background: ${theme.colors.bg.input};
+  outline: none;
+  box-sizing: border-box;
+  transition: ${theme.animations.transition};
+
+  &:focus {
+    border-color: ${theme.colors.border.focus};
+  }
+`
+
+const ApiKeyInput = styled.input`
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: ${theme.typography.fontFamily};
+  color: ${theme.colors.text.primary};
+  background: ${theme.colors.bg.input};
+  outline: none;
+  box-sizing: border-box;
+  transition: ${theme.animations.transition};
+
+  &:focus {
+    border-color: ${theme.colors.border.focus};
+  }
+
+  &::placeholder {
+    color: ${theme.colors.text.muted};
+  }
 `

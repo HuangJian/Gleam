@@ -1,4 +1,4 @@
-import { Gleam } from '../domain/gleam'
+import type { GleamWithIntelligence } from '../domain/intelligence'
 
 export interface TagCount {
   tag: string
@@ -13,10 +13,10 @@ export interface TagCount {
  * This is a pure utility — the caller provides the gleams (e.g., from
  * SyncService.getTimeline or the current timeline groups).
  */
-export function countTags(gleams: Gleam[]): TagCount[] {
+export function countTags(items: GleamWithIntelligence[]): TagCount[] {
   const counts = new Map<string, number>()
-  for (const gleam of gleams) {
-    for (const tag of gleam.tags) {
+  for (const item of items) {
+    for (const tag of item.gleam.tags) {
       counts.set(tag, (counts.get(tag) ?? 0) + 1)
     }
   }

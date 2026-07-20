@@ -34,6 +34,14 @@ export const theme = {
       caption: 'hsl(35, 10%, 50%)', // Muted label
       text: 'hsl(35, 12%, 40%)', // Readable secondary
     },
+
+    /** AI / Intelligence — muted purple, deliberately distinct from gold brand. */
+    intelligence: {
+      accent: 'hsl(280, 45%, 55%)', // ✦ icon color, section headers
+      summaryText: 'hsl(35, 12%, 50%)', // AI summary body text (muted gray)
+      tagBorder: 'hsl(280, 35%, 65%)', // dashed border for AI tags
+      tagBg: 'rgba(180, 160, 200, 0.08)', // subtle purple wash for AI tags
+    },
   },
   typography: {
     fontFamily:
