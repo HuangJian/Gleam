@@ -33,17 +33,11 @@ describe('GleamCard', () => {
     expect(queryByText('My Post')).toBeNull()
   })
 
-  test('shows a revisit badge when revisitCount > 0', () => {
-    const gleam = makeGleam({ revisitCount: 3 })
-    const { getByText } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
-    expect(getByText(/3/)).toBeTruthy()
-  })
-
-  test('does not show a revisit badge when revisitCount is 0', () => {
-    const gleam = makeGleam({ revisitCount: 0 })
+  test('does not show revisit badge on the card', () => {
+    const gleam = makeGleam({ revisitCount: 5 })
     const { queryByText } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
-    // The badge text is "👁 {count}" — only appears for count > 0.
-    expect(queryByText('👁')).toBeNull()
+    // Revisit count is no longer displayed on the card (shown only in detail view).
+    expect(queryByText(/👁/)).toBeNull()
   })
 
   test('calls onRevisit and onClick when the card is clicked', () => {
@@ -86,25 +80,16 @@ describe('GleamCard', () => {
     expect(container.textContent).not.toContain('✦')
   })
 
-  // ── Tag Provenance ──
+  // ── Tags removed from card ──
 
-  test('shows ✦ indicator on AI-suggested tags', () => {
+  test('does not show tags on the card', () => {
     const gleam = makeGleam({ tags: ['react', 'hooks'] })
     const intelligence = makeIntelligence({ aiTags: ['react'] })
-    const { getAllByText } = render(
+    const { queryByText } = render(
       <GleamCard gleam={gleam} intelligence={intelligence} onRevisit={() => {}} />,
     )
-    // Only 'react' should have the ✦ prefix
-    const aiPrefixes = getAllByText('✦')
-    expect(aiPrefixes).toHaveLength(1)
-  })
-
-  test('does not show ✦ on user-only tags', () => {
-    const gleam = makeGleam({ tags: ['react', 'hooks'] })
-    const intelligence = makeIntelligence({ aiTags: [] })
-    const { queryAllByText } = render(
-      <GleamCard gleam={gleam} intelligence={intelligence} onRevisit={() => {}} />,
-    )
-    expect(queryAllByText('✦')).toHaveLength(0)
+    // Tags are no longer displayed on the card (shown only in detail view).
+    expect(queryByText('react')).toBeNull()
+    expect(queryByText('hooks')).toBeNull()
   })
 })

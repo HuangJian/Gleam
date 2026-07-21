@@ -13,7 +13,7 @@ import { TagCount } from '../../services/tag'
 import type { SyncState } from '../../services/sync'
 import { theme } from '../theme'
 import { METEOR_ICON_URL } from '../assets'
-import { formatReviewTime, getSourceHost } from '../../utils/review'
+import { formatDetailTime, getSourceHost } from '../../utils/review'
 
 const RANGE_OPTIONS = ['自定义', '今天', '本周', '近三天', '近十天', '近三十天'] as const
 type RangeOption = (typeof RANGE_OPTIONS)[number]
@@ -152,10 +152,17 @@ export function ReviewRoom({
   if (!isOpen) return null
 
   const countMap = new Map(tagCounts.map((tc) => [tc.tag, tc.count]))
+  const aiTagSet = new Set(viewingGleam?.intelligence.aiTags ?? [])
+  // User-entered tags always precede AI tags; within each group, sort by usage count desc.
   const sortedTags = viewingGleam
     ? viewingGleam.gleam.tags
         .slice()
-        .sort((a, b) => (countMap.get(b) ?? 0) - (countMap.get(a) ?? 0))
+        .sort((a, b) => {
+          const aAi = aiTagSet.has(a) ? 1 : 0
+          const bAi = aiTagSet.has(b) ? 1 : 0
+          if (aAi !== bAi) return aAi - bAi
+          return (countMap.get(b) ?? 0) - (countMap.get(a) ?? 0)
+        })
     : []
 
   // handleCardClick — ONLY opens the detail view.
@@ -182,7 +189,6 @@ export function ReviewRoom({
   }
 
   const summary = viewingGleam?.intelligence.summary ?? null
-  const aiTagSet = new Set(viewingGleam?.intelligence.aiTags ?? [])
 
   return (
     <Overlay data-testid="review-room">
@@ -282,7 +288,6 @@ export function ReviewRoom({
                             onRevisit={onRevisitGleam}
                             onClick={() => handleCardClick(item)}
                             selected={viewingGleam?.gleam.id === item.gleam.id}
-                            tagCounts={tagCounts}
                             highlight={highlights[item.gleam.id] ?? null}
                           />
                         ))}
@@ -298,6 +303,7 @@ export function ReviewRoom({
             {viewingGleam ? (
               <>
                 <DetailHeader>
+                  <DetailTime>{formatDetailTime(viewingGleam.gleam.createdAt)}</DetailTime>
                   <HeaderTags>
                     {sortedTags.map((tag) => (
                       <HeaderTagChip
@@ -312,14 +318,11 @@ export function ReviewRoom({
                       </HeaderTagChip>
                     ))}
                   </HeaderTags>
-                  <DetailTime>{formatReviewTime(viewingGleam.gleam.createdAt)}</DetailTime>
-                  <DetailActions>
-                    {viewingGleam.gleam.revisitCount > 0 ? (
-                      <RevisitBadge title={`回顾次数: ${viewingGleam.gleam.revisitCount}`}>
-                        👁 {viewingGleam.gleam.revisitCount}
-                      </RevisitBadge>
-                    ) : null}
-                  </DetailActions>
+                  {viewingGleam.gleam.revisitCount > 0 && (
+                    <RevisitBadge title={`回顾次数: ${viewingGleam.gleam.revisitCount}`}>
+                      👁 {viewingGleam.gleam.revisitCount}
+                    </RevisitBadge>
+                  )}
                 </DetailHeader>
 
                 <DetailContent>
@@ -327,31 +330,12 @@ export function ReviewRoom({
                     <MarkdownPreview content={viewingGleam.gleam.thought} />
                   </ThoughtText>
 
-                  {summary && (
-                    <AIObservationSection>
-                      <AIObservationHeader>
-                        <AIObservationLabel>AI 观察</AIObservationLabel>
-                        <RegenerateButton
-                          onClick={() => handleRegenerate('SUMMARY')}
-                          title="重新生成摘要"
-                          disabled={regenerating === 'SUMMARY'}
-                        >
-                          {regenerating === 'SUMMARY' ? '已请求' : '↻'}
-                        </RegenerateButton>
-                      </AIObservationHeader>
-                      <AISummaryText>
-                        <AIPrefix>✦</AIPrefix>
-                        {summary}
-                      </AISummaryText>
-                    </AIObservationSection>
-                  )}
-
                   {viewingGleam.gleam.source.excerpt && (
-                    <SourceExcerpt text={viewingGleam.gleam.source.excerpt} />
+                    <SourceExcerpt text={viewingGleam.gleam.source.excerpt} scroll={false} />
                   )}
 
                   {viewingGleam.gleam.source.media && (
-                    <MediaPreview media={viewingGleam.gleam.source.media} />
+                    <MediaPreview media={viewingGleam.gleam.source.media} fullSize />
                   )}
 
                   {viewingGleam.gleam.source.url && (
@@ -373,21 +357,43 @@ export function ReviewRoom({
                     </SourceFooter>
                   )}
 
-                  <RelationList relations={relations} onRelationClick={handleRelationClick} />
+                  {summary && (
+                    <AIObservationSection>
+                      <AIObservationHeader>
+                        <AIObservationLabel>AI 观察</AIObservationLabel>
+                        <RegenerateButton
+                          onClick={() => handleRegenerate('SUMMARY')}
+                          title="重新生成摘要"
+                          disabled={regenerating === 'SUMMARY'}
+                        >
+                          {regenerating === 'SUMMARY' ? '已请求' : '↻'}
+                        </RegenerateButton>
+                      </AIObservationHeader>
+                      <AISummaryText>
+                        <AIPrefix>✦</AIPrefix>
+                        {summary}
+                      </AISummaryText>
+                    </AIObservationSection>
+                  )}
 
                   <TagEditor
                     tags={viewingGleam.gleam.tags}
                     tagCounts={tagCounts}
-                    aiTags={viewingGleam.intelligence.aiTags}
                     onAdd={(tag) => onAddTag(viewingGleam.gleam.id, tag)}
-                    onRemove={(tag) => onRemoveTag(viewingGleam.gleam.id, tag)}
+                  />
+
+                  <RelationList
+                    relations={[...relations].sort(
+                      (a, b) => (b.strength ?? -1) - (a.strength ?? -1),
+                    )}
+                    onRelationClick={handleRelationClick}
                   />
                 </DetailContent>
               </>
             ) : (
               <DetailPlaceholder>
                 <PlaceholderIcon src={METEOR_ICON_URL} alt="" />
-                <PlaceholderText>选择微光，细细品味</PlaceholderText>
+                <PlaceholderText>选择微光，细细鉴赏</PlaceholderText>
               </DetailPlaceholder>
             )}
           </DetailColumn>
@@ -460,7 +466,8 @@ const DetailColumn = styled.div`
   background: ${theme.colors.bg.input};
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 `
 
 const Header = styled.header`
@@ -874,13 +881,6 @@ const HeaderTagRemove = styled.span`
   opacity: 0.6;
 `
 
-const DetailActions = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-`
-
 const RevisitBadge = styled.span`
   font-size: 11px;
   background: rgba(200, 180, 140, 0.15);
@@ -892,8 +892,6 @@ const RevisitBadge = styled.span`
 const DetailContent = styled.div`
   flex: 1;
   padding: 16px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 12px;

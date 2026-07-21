@@ -6,6 +6,10 @@ import { SourceMedia } from '../../domain/gleam'
 interface MediaPreviewProps {
   media: SourceMedia
   compact?: boolean
+  /** Show the "图片 · 原始来源" label above the media. Default: true. */
+  showLabel?: boolean
+  /** Remove the max-height cap so the media displays at full size (detail view). */
+  fullSize?: boolean
 }
 
 const KIND_LABEL: Record<SourceMedia['kind'], string> = {
@@ -14,27 +18,46 @@ const KIND_LABEL: Record<SourceMedia['kind'], string> = {
   video: '视频',
 }
 
-export function MediaPreview({ media, compact = false }: MediaPreviewProps) {
+export function MediaPreview({
+  media,
+  compact = false,
+  showLabel = true,
+  fullSize = false,
+}: MediaPreviewProps) {
   const [failed, setFailed] = useState(false)
 
   const handleError = () => setFailed(true)
 
   return (
     <Wrapper $compact={compact}>
-      <Label>
-        {KIND_LABEL[media.kind]} ·{' '}
-        <SourceLink href={media.src} target="_blank" rel="noopener noreferrer">
-          原始来源
-        </SourceLink>
-      </Label>
+      {showLabel && (
+        <Label>
+          {KIND_LABEL[media.kind]} ·{' '}
+          <SourceLink href={media.src} target="_blank" rel="noopener noreferrer">
+            原始来源
+          </SourceLink>
+        </Label>
+      )}
       {failed ? (
         <ErrorHint>该媒体来自原网站，跨站访问可能受防盗链限制而无法显示</ErrorHint>
       ) : media.kind === 'image' ? (
-        <PreviewImage src={media.src} alt="捕获的媒体" onError={handleError} $compact={compact} />
+        <PreviewImage
+          src={media.src}
+          alt="捕获的媒体"
+          onError={handleError}
+          $compact={compact}
+          $fullSize={fullSize}
+        />
       ) : media.kind === 'audio' ? (
         <AudioEl controls src={media.src} onError={handleError} />
       ) : (
-        <VideoEl controls src={media.src} onError={handleError} $compact={compact} />
+        <VideoEl
+          controls
+          src={media.src}
+          onError={handleError}
+          $compact={compact}
+          $fullSize={fullSize}
+        />
       )}
     </Wrapper>
   )
@@ -64,18 +87,20 @@ const SourceLink = styled.a`
   }
 `
 
-const PreviewImage = styled.img<{ $compact: boolean }>`
+const PreviewImage = styled.img<{ $compact: boolean; $fullSize: boolean }>`
   max-width: 100%;
-  max-height: ${(p) => (p.$compact ? '160px' : 'calc(var(--gleam-modal-height, 80vh) * 0.4)')};
+  max-height: ${(p) =>
+    p.$fullSize ? 'none' : p.$compact ? '160px' : 'calc(var(--gleam-modal-height, 80vh) * 0.4)'};
   border-radius: 8px;
   border: 1px solid ${theme.colors.border.light};
   object-fit: contain;
   background: ${theme.colors.bg.input};
 `
 
-const VideoEl = styled.video<{ $compact: boolean }>`
+const VideoEl = styled.video<{ $compact: boolean; $fullSize: boolean }>`
   max-width: 100%;
-  max-height: ${(p) => (p.$compact ? '200px' : 'calc(var(--gleam-modal-height, 80vh) * 0.4)')};
+  max-height: ${(p) =>
+    p.$fullSize ? 'none' : p.$compact ? '200px' : 'calc(var(--gleam-modal-height, 80vh) * 0.4)'};
   border-radius: 8px;
   border: 1px solid ${theme.colors.border.light};
   background: #000;

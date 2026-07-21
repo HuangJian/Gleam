@@ -1,6 +1,7 @@
 import styled from '@emotion/styled'
 import type { GleamRelation } from '../../domain/intelligence'
 import { theme } from '../theme'
+import { formatDetailDate } from '../../utils/review'
 
 interface RelationListProps {
   relations: GleamRelation[]
@@ -22,6 +23,7 @@ export function RelationList({ relations, onRelationClick }: RelationListProps) 
             onClick={() => onRelationClick(rel.targetGleam.id)}
             title={rel.targetGleam.thought}
           >
+            <RelationDate>{formatDetailDate(rel.targetGleam.createdAt)}</RelationDate>
             <RelationBullet>◦</RelationBullet>
             <RelationText>{truncate(rel.targetGleam.thought)}</RelationText>
             {rel.origin === 'ai' && rel.strength !== null && (
@@ -78,6 +80,20 @@ const RelationBullet = styled.span`
   color: ${theme.colors.intelligence.accent};
   font-size: 14px;
   flex-shrink: 0;
+`
+
+const RelationDate = styled.span`
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.3px;
+  color: ${theme.colors.text.muted};
+  background: ${theme.colors.bg.input};
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+  white-space: nowrap;
 `
 
 const RelationText = styled.span`

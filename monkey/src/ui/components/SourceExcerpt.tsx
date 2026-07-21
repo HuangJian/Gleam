@@ -7,6 +7,8 @@ interface SourceExcerptProps {
   text: string
   /** Compact mode for card/list display (smaller fonts, tighter, clamped). */
   compact?: boolean
+  /** Allow the excerpt to scroll when taller than its cap. Default: true. Pass false to show the full excerpt (detail view). */
+  scroll?: boolean
 }
 
 /**
@@ -17,9 +19,9 @@ interface SourceExcerptProps {
  * MarkdownPreview). The source is stored as Markdown and rendered as such,
  * preserving the page's block structure (lists, quotes, …).
  */
-export function SourceExcerpt({ text, compact = false }: SourceExcerptProps) {
+export function SourceExcerpt({ text, compact = false, scroll = true }: SourceExcerptProps) {
   return (
-    <Wrapper $compact={compact}>
+    <Wrapper $compact={compact} $scroll={scroll}>
       <Caption $compact={compact}>来源引用</Caption>
       <Quote $compact={compact}>
         <MarkdownPreview content={text} compact={compact} />
@@ -28,7 +30,7 @@ export function SourceExcerpt({ text, compact = false }: SourceExcerptProps) {
   )
 }
 
-const Wrapper = styled.figure<{ $compact: boolean }>`
+const Wrapper = styled.figure<{ $compact: boolean; $scroll: boolean }>`
   margin: 0;
   padding: ${(p) => (p.$compact ? '8px 12px' : '12px 16px')};
   background: ${theme.colors.reference.bg};
@@ -39,6 +41,7 @@ const Wrapper = styled.figure<{ $compact: boolean }>`
   gap: 4px;
   ${(p) =>
     !p.$compact &&
+    p.$scroll &&
     `
     max-height: 180px;
     overflow-y: auto;
