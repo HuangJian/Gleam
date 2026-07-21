@@ -499,6 +499,7 @@ describe('SqliteRepository intelligence config', () => {
       endpoint: 'https://api.openai.com',
       encryptedApiKey: 'enc',
       apiKeyIv: 'iv',
+      reasoningSuppression: false,
       updatedAt: new Date().toISOString(),
       ...overrides,
     }

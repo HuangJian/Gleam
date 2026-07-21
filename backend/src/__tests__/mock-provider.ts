@@ -4,6 +4,7 @@ import type {
   LLMProvider,
   SummarizeResult,
   TagsResult,
+  ValidationResult,
 } from '../gateway/llm-provider'
 
 /**
@@ -52,8 +53,9 @@ export class MockProvider implements LLMProvider {
   failTags = false
   failEmbedding = false
 
-  async validateConfig(): Promise<void> {
+  async validateConfig(): Promise<ValidationResult> {
     // Always valid — no external dependencies.
+    return { reasoningSuppression: false }
   }
 
   async summarize(input: LLMInput, _prompt: string): Promise<SummarizeResult> {

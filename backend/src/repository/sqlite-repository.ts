@@ -810,6 +810,7 @@ export class SqliteRepository implements IRepository, IIntelligenceRepository {
       endpoint: row.endpoint,
       encryptedApiKey: row.encryptedApiKey,
       apiKeyIv: row.apiKeyIv,
+      reasoningSuppression: row.reasoningSuppression,
       updatedAt: row.updatedAt,
     }
   }
@@ -828,6 +829,7 @@ export class SqliteRepository implements IRepository, IIntelligenceRepository {
           endpoint: config.endpoint,
           encryptedApiKey: config.encryptedApiKey,
           apiKeyIv: config.apiKeyIv,
+          reasoningSuppression: config.reasoningSuppression,
           updatedAt: now,
         })
         .run()

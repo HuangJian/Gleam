@@ -276,6 +276,7 @@ async function saveProviderConfig(repository: SqliteRepository): Promise<void> {
     endpoint: 'https://api.openai.com',
     encryptedApiKey: encrypted.ciphertext,
     apiKeyIv: encrypted.iv,
+    reasoningSuppression: false,
     updatedAt: new Date().toISOString(),
   })
 }

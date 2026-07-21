@@ -589,9 +589,13 @@ builder.mutationType({
 
         // Validate before persisting — invalid credentials are rejected
         // immediately. Only usable provider configurations are stored.
+        // validateConfig() also probes reasoning suppression support; the
+        // result is persisted so runtime never re-probes.
         const probe = createProviderForValidation(provider, model, apiKey, embeddingModel, endpoint)
+        let reasoningSuppression: boolean
         try {
-          await probe.validateConfig()
+          const result = await probe.validateConfig()
+          reasoningSuppression = result.reasoningSuppression
         } catch (e) {
           logger.warn('Provider validation failed', {
             provider,
@@ -627,12 +631,19 @@ builder.mutationType({
           model,
           embeddingModel,
           endpoint,
+          reasoningSuppression,
           encryptedApiKey: encrypted.ciphertext,
           apiKeyIv: encrypted.iv,
           updatedAt: new Date().toISOString(),
         })
 
-        logger.info('Provider configured', { provider, model, embeddingModel, endpoint })
+        logger.info('Provider configured', {
+          provider,
+          model,
+          embeddingModel,
+          endpoint,
+          reasoningSuppression,
+        })
         return { provider, model, embeddingModel, endpoint, success: true }
       },
     }),

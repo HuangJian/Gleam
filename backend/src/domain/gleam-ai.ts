@@ -150,6 +150,11 @@ export interface IntelligenceConfig {
   endpoint: string
   encryptedApiKey: string // base64 ciphertext
   apiKeyIv: string // base64 IV
+  /**
+   * Whether the API accepts `reasoning: { enabled: false }` to suppress
+   * chain-of-thought. Probed once during validateConfig() and persisted.
+   */
+  reasoningSuppression: boolean
   updatedAt: string
 }
 

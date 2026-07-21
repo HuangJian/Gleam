@@ -27,6 +27,7 @@ export function createProvider(config: IntelligenceConfig): LLMProvider {
         model: config.model,
         embeddingModel: config.embeddingModel,
         endpoint: config.endpoint,
+        reasoningSuppression: config.reasoningSuppression,
       })
     default:
       throw new LLMError(`Unknown provider: ${config.provider}`, false)
@@ -52,11 +53,14 @@ export function createProviderForValidation(
   switch (provider) {
     case 'openai':
     case 'openai-compatible':
+      // reasoningSuppression starts false; validateConfig() probes the API
+      // and returns the result for the caller to persist.
       return new OpenAICompatibleProvider({
         apiKey,
         model,
         embeddingModel,
         endpoint,
+        reasoningSuppression: false,
       })
     default:
       throw new LLMError(`Unknown provider: ${provider}`, false)
@@ -70,4 +74,5 @@ export type {
   SummarizeResult,
   TagsResult,
   EmbeddingResult,
+  ValidationResult,
 } from './llm-provider'

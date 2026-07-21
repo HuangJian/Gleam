@@ -4,8 +4,10 @@ import type {
   LLMProvider,
   SummarizeResult,
   TagsResult,
+  ValidationResult,
 } from './llm-provider'
 import { LLMError } from './llm-provider'
+import { logger } from '../util/logger'
 
 /**
  * OpenAI-compatible provider implementation.
@@ -16,10 +18,6 @@ import { LLMError } from './llm-provider'
  * The user-supplied `endpoint` is used as the base URL; chat and embedding
  * URLs are auto-completed as `{endpoint}/v1/chat/completions` and
  * `{endpoint}/v1/embeddings`.
- *
- * NOTE: Future expansion may support different providers/endpoints for
- * chat and embedding (e.g., chat from one service, embeddings from another).
- * For now, both capabilities share the same endpoint and API key.
  */
 
 interface OpenAICompatibleProviderOptions {
@@ -35,12 +33,23 @@ interface OpenAICompatibleProviderOptions {
   /** Base API endpoint (e.g. 'https://api.openai.com' or 'https://integrate.api.nvidia.com'). */
   endpoint: string
   /**
-   * Disable chain-of-thought for reasoning models (e.g. NVIDIA
-   * nemotron-3-ultra). When true, chat requests send
-   * `reasoning: { enabled: false }` so `content` holds only the answer.
-   * Standard OpenAI models reject the param, so it is opt-in.
+   * Whether the API accepts `reasoning: { enabled: false }` to suppress
+   * chain-of-thought output. Probed once during `validateConfig()` and
+   * persisted in the database — passed back here when constructing the
+   * provider at runtime so no re-probing is needed.
    */
-  reasoningEnabled?: boolean
+  reasoningSuppression: boolean
+}
+
+/** Response shape from an OpenAI-compatible chat completion endpoint. */
+interface ChatCompletionResponse {
+  choices?: Array<{
+    message?: {
+      content?: string
+      /** Reasoning chain-of-thought, returned separately by some APIs. */
+      reasoning_content?: string
+    }
+  }>
 }
 
 export class OpenAICompatibleProvider implements LLMProvider {
@@ -51,13 +60,13 @@ export class OpenAICompatibleProvider implements LLMProvider {
   private readonly apiKey: string
   private readonly chatUrl: string
   private readonly embeddingsUrl: string
-  private readonly reasoningEnabled: boolean
+  private readonly reasoningSuppression: boolean
 
   constructor(opts: OpenAICompatibleProviderOptions) {
     this.apiKey = opts.apiKey
     this.model = opts.model
     this.embeddingModel = opts.embeddingModel
-    this.reasoningEnabled = opts.reasoningEnabled ?? false
+    this.reasoningSuppression = opts.reasoningSuppression
     const base = opts.endpoint.replace(/\/+$/, '')
     if (!base) {
       throw new Error('OpenAI-compatible provider requires a non-empty endpoint')
@@ -66,7 +75,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     this.embeddingsUrl = `${base}/v1/embeddings`
   }
 
-  async validateConfig(): Promise<void> {
+  async validateConfig(): Promise<ValidationResult> {
     try {
       const res = await fetch(this.embeddingsUrl, {
         method: 'POST',
@@ -98,6 +107,12 @@ export class OpenAICompatibleProvider implements LLMProvider {
         true,
       )
     }
+
+    // Probe the chat endpoint for reasoning suppression support.
+    // This runs once at configuration time; the result is persisted and
+    // reused for all future provider instances.
+    const reasoningSuppression = await this.probeReasoningSuppression()
+    return { reasoningSuppression }
   }
 
   async summarize(input: LLMInput, prompt: string): Promise<SummarizeResult> {
@@ -174,13 +189,64 @@ export class OpenAICompatibleProvider implements LLMProvider {
     }
   }
 
+  /**
+   * Probes the chat endpoint to determine whether the API accepts the
+   * `reasoning: { enabled: false }` parameter.
+   *
+   * Sends a minimal chat request ("Say OK.", max_tokens 5) with the param.
+   * If the API returns 200, the param is supported. If it returns 400/422,
+   * the param is not supported. On network error, falls back to
+   * `isReasoningModel()` pattern matching on the model name.
+   *
+   * Called once during `validateConfig()`. The result is persisted in the
+   * database and passed to future provider constructors — this method is
+   * never called at runtime.
+   */
+  private async probeReasoningSuppression(): Promise<boolean> {
+    try {
+      const res = await fetch(this.chatUrl, {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: 5,
+          reasoning: { enabled: false },
+          messages: [{ role: 'user', content: 'Say OK.' }],
+        }),
+      })
+
+      if (res.ok) {
+        const data = (await res.json().catch(() => null)) as ChatCompletionResponse | null
+        const hasReasoningContent = !!data?.choices?.[0]?.message?.reasoning_content
+
+        logger.info('Reasoning probe: suppression param accepted', {
+          model: this.model,
+          reasoningContent: hasReasoningContent,
+        })
+        return true
+      }
+
+      logger.info('Reasoning probe: suppression param rejected', {
+        model: this.model,
+        status: res.status,
+      })
+      return false
+    } catch {
+      // Network error — fall back to pattern matching on the model name.
+      const fallback = isReasoningModel(this.model)
+      logger.debug('Reasoning probe: network error, using pattern fallback', {
+        model: this.model,
+        suppressed: fallback,
+      })
+      return fallback
+    }
+  }
+
   private async chatCompletion(
     systemPrompt: string,
     userContent: string,
     opts: { temperature: number; maxTokens: number },
-  ): Promise<{
-    choices?: Array<{ message?: { content?: string } }>
-  }> {
+  ): Promise<ChatCompletionResponse> {
     let res: Response
     try {
       const body: Record<string, unknown> = {
@@ -193,9 +259,10 @@ export class OpenAICompatibleProvider implements LLMProvider {
         ],
       }
       // Reasoning models (e.g. NVIDIA nemotron-3-ultra) emit chain-of-thought
-      // into `content` by default; disabling keeps `content` clean. Standard
-      // OpenAI models reject the param, so it is only sent when opted in.
-      if (this.reasoningEnabled) {
+      // into `content` by default; disabling keeps `content` clean. The flag
+      // was probed once during validateConfig() and persisted — no runtime
+      // probing needed.
+      if (this.reasoningSuppression) {
         body.reasoning = { enabled: false }
       }
       res = await fetch(this.chatUrl, {
@@ -211,9 +278,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       throw await this.toLLMError(res, 'Chat request failed')
     }
 
-    return (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>
-    }
+    return (await res.json()) as ChatCompletionResponse
   }
 
   private async toLLMError(res: Response, prefix: string): Promise<LLMError> {
@@ -224,8 +289,6 @@ export class OpenAICompatibleProvider implements LLMProvider {
       // ignore
     }
     const retryable = res.status === 429 || res.status >= 500
-    // 401 is auth — permanent. 404 is model not found — permanent.
-    // 429 is rate limit — retryable. 5xx is server — retryable.
     const snippet = body.length > 200 ? body.slice(0, 200) + '…' : body
     return new LLMError(
       `${prefix}: ${res.status} ${res.statusText} ${snippet}`,
@@ -236,6 +299,32 @@ export class OpenAICompatibleProvider implements LLMProvider {
 }
 
 // ── Helpers ────────────────────────────────────────────
+
+/**
+ * Known reasoning model name patterns.
+ *
+ * Used as a fallback when the runtime probe fails (e.g. network error
+ * during validation). The primary detection mechanism is
+ * `probeReasoningSuppression()`, which tests the actual API behavior.
+ */
+const REASONING_MODEL_PATTERNS: readonly RegExp[] = [
+  /nemotron/i, // NVIDIA Nemotron series
+  /deepseek-r(\d)/i, // DeepSeek R1, R2, …
+  /deepseek-reasoner/i, // DeepSeek Reasoner
+  /qwq/i, // Qwen QwQ
+]
+
+/**
+ * Returns true if the model name matches a known reasoning model pattern.
+ *
+ * This is a **fallback** used only when the validation-time probe fails.
+ * The primary detection is `OpenAICompatibleProvider.probeReasoningSuppression()`,
+ * which sends a minimal request to test whether the API actually accepts
+ * the `reasoning: { enabled: false }` parameter.
+ */
+export function isReasoningModel(model: string): boolean {
+  return REASONING_MODEL_PATTERNS.some((re) => re.test(model))
+}
 
 function buildUserContent(input: LLMInput): string {
   const parts: string[] = []
@@ -268,13 +357,6 @@ function buildEmbeddingText(input: LLMInput): string {
  *   - One-per-line: tag1\ntag2
  *
  * Strips leading `#` from each tag and trims whitespace.
- *
- * NOTE: case is NOT normalized. Reasoning models (e.g. NVIDIA
- * nemotron-3-ultra) occasionally emit camelCase tags (e.g. `useReducer`)
- * that violate the lowercase kebab-case contract the Tags prompt requests.
- * This is a known model-adherence gap — callers that require strict
- * kebab-case must normalize downstream (see validate-tags.ts, which
- * reports such tags as a WARN rather than failing).
  */
 function parseTagsResponse(raw: string): string[] {
   // Try JSON first.

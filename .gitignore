@@ -4,6 +4,7 @@ data/
 *.log
 .DS_Store
 .vscode/
+.workbuddy/
 dist-monkey/
 
 *.tsbuildinfo

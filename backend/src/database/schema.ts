@@ -119,6 +119,11 @@ export const intelligenceConfig = sqliteTable('intelligence_config', {
   endpoint: text('endpoint').notNull().default(''),
   encryptedApiKey: text('encrypted_api_key').notNull(),
   apiKeyIv: text('api_key_iv').notNull(),
+  // Whether the API accepts reasoning: { enabled: false }. Probed once
+  // during validateConfig(), persisted, never re-probed at runtime.
+  reasoningSuppression: integer('reasoning_suppression', { mode: 'boolean' })
+    .notNull()
+    .default(false),
   updatedAt: text('updated_at').notNull(),
 })
 

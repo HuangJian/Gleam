@@ -24,7 +24,7 @@ beforeAll(() => {
 // network. We stub it to a no-op validator so the resolver logic (persist +
 // conditional reset) is exercised without I/O.
 
-const validateConfig = mock(() => Promise.resolve())
+const validateConfig = mock(() => Promise.resolve({ reasoningSuppression: false }))
 mock.module('../gateway', () => ({
   createProviderForValidation: () => ({ validateConfig }),
   createProvider: () => ({ validateConfig }),

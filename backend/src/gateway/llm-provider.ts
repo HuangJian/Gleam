@@ -35,6 +35,23 @@ export interface LLMInput {
 
 // ── Result types ───────────────────────────────────────
 
+/**
+ * Result of `validateConfig()`. Carries provider-specific metadata
+ * discovered during validation that should be persisted alongside
+ * the provider configuration.
+ */
+export interface ValidationResult {
+  /**
+   * Whether the API accepts `reasoning: { enabled: false }` to suppress
+   * chain-of-thought output. When true, chat requests send the param so
+   * `content` holds only the answer (not the CoT trace).
+   *
+   * Probed once during validation and persisted — never re-probed at
+   * runtime to avoid unnecessary API calls and rate-limit triggers.
+   */
+  reasoningSuppression: boolean
+}
+
 export interface SummarizeResult {
   summary: string
 }
@@ -85,8 +102,12 @@ export interface LLMProvider {
    * Called by `configureProvider` before persistence — invalid
    * credentials are rejected immediately. Throws `LLMError` on
    * failure (non-retryable for auth issues).
+   *
+   * Returns a `ValidationResult` with provider-specific metadata
+   * (e.g. reasoning suppression support) that should be persisted
+   * alongside the configuration.
    */
-  validateConfig(): Promise<void>
+  validateConfig(): Promise<ValidationResult>
 
   summarize(input: LLMInput, prompt: string): Promise<SummarizeResult>
   generateTags(input: LLMInput, prompt: string): Promise<TagsResult>
