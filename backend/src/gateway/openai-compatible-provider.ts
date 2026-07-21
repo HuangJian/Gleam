@@ -8,24 +8,21 @@ import type {
 import { LLMError } from './llm-provider'
 
 /**
- * OpenAI reference provider implementation.
+ * OpenAI-compatible provider implementation.
  *
- * Uses the OpenAI Chat Completions API for summary/tag generation and
- * the Embeddings API for embedding generation. All HTTP calls use the
- * built-in `fetch` (no SDK dependency).
+ * Works with any API that conforms to the OpenAI Chat Completions and
+ * Embeddings formats (e.g. OpenAI, NVIDIA, Azure OpenAI, local LLMs).
  *
- * Provider-specific response formats, retry policies and rate limits
- * never propagate into business logic — they remain entirely inside
- * this adapter.
+ * The user-supplied `endpoint` is used as the base URL; chat and embedding
+ * URLs are auto-completed as `{endpoint}/v1/chat/completions` and
+ * `{endpoint}/v1/embeddings`.
  *
- * The `apiKey` is held in memory only at the point of invocation and
- * is never logged.
+ * NOTE: Future expansion may support different providers/endpoints for
+ * chat and embedding (e.g., chat from one service, embeddings from another).
+ * For now, both capabilities share the same endpoint and API key.
  */
 
-const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions'
-const OPENAI_EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings'
-
-interface OpenAIProviderOptions {
+interface OpenAICompatibleProviderOptions {
   apiKey: string
   /** Chat model for summary/tag generation (e.g. 'gpt-4o-mini'). */
   model: string
@@ -35,8 +32,8 @@ interface OpenAIProviderOptions {
    * with different dimensions.
    */
   embeddingModel: string
-  /** Base URL override (for testing or OpenAI-compatible providers). */
-  baseUrl?: string
+  /** Base API endpoint (e.g. 'https://api.openai.com' or 'https://integrate.api.nvidia.com'). */
+  endpoint: string
   /**
    * Disable chain-of-thought for reasoning models (e.g. NVIDIA
    * nemotron-3-ultra). When true, chat requests send
@@ -46,8 +43,8 @@ interface OpenAIProviderOptions {
   reasoningEnabled?: boolean
 }
 
-export class OpenAIProvider implements LLMProvider {
-  readonly name = 'openai'
+export class OpenAICompatibleProvider implements LLMProvider {
+  readonly name = 'openai-compatible'
   readonly model: string
   readonly embeddingModel: string
 
@@ -56,19 +53,20 @@ export class OpenAIProvider implements LLMProvider {
   private readonly embeddingsUrl: string
   private readonly reasoningEnabled: boolean
 
-  constructor(opts: OpenAIProviderOptions) {
+  constructor(opts: OpenAICompatibleProviderOptions) {
     this.apiKey = opts.apiKey
     this.model = opts.model
     this.embeddingModel = opts.embeddingModel
     this.reasoningEnabled = opts.reasoningEnabled ?? false
-    const base = (opts.baseUrl ?? '').replace(/\/$/, '')
-    this.chatUrl = base ? `${base}/v1/chat/completions` : OPENAI_CHAT_URL
-    this.embeddingsUrl = base ? `${base}/v1/embeddings` : OPENAI_EMBEDDINGS_URL
+    const base = opts.endpoint.replace(/\/+$/, '')
+    if (!base) {
+      throw new Error('OpenAI-compatible provider requires a non-empty endpoint')
+    }
+    this.chatUrl = `${base}/v1/chat/completions`
+    this.embeddingsUrl = `${base}/v1/embeddings`
   }
 
   async validateConfig(): Promise<void> {
-    // Light validation: issue a minimal embeddings request. If the key
-    // or model is invalid, OpenAI returns 401/404 immediately.
     try {
       const res = await fetch(this.embeddingsUrl, {
         method: 'POST',
@@ -79,15 +77,15 @@ export class OpenAIProvider implements LLMProvider {
         }),
       })
       if (res.status === 401) {
-        throw new LLMError('Invalid OpenAI API key', false, 401)
+        throw new LLMError('Invalid API key or endpoint', false, 401)
       }
       if (res.status === 404) {
-        throw new LLMError(`Unknown OpenAI model: ${this.embeddingModel}`, false, 404)
+        throw new LLMError(`Unknown model: ${this.embeddingModel}`, false, 404)
       }
       if (!res.ok && res.status !== 400) {
         // 400 can happen if 'validation' is rejected for length but auth was fine.
         throw new LLMError(
-          `OpenAI validation failed: ${res.status} ${res.statusText}`,
+          `Validation failed: ${res.status} ${res.statusText}`,
           res.status >= 500,
           res.status,
         )
@@ -96,7 +94,7 @@ export class OpenAIProvider implements LLMProvider {
       if (e instanceof LLMError) throw e
       // Network errors are retryable.
       throw new LLMError(
-        `OpenAI validation network error: ${e instanceof Error ? e.message : String(e)}`,
+        `Validation network error: ${e instanceof Error ? e.message : String(e)}`,
         true,
       )
     }
@@ -110,7 +108,7 @@ export class OpenAIProvider implements LLMProvider {
     })
     const summary = data.choices?.[0]?.message?.content?.trim()
     if (!summary) {
-      throw new LLMError('OpenAI returned empty summary', true)
+      throw new LLMError('Provider returned empty summary', true)
     }
     return { summary }
   }
@@ -124,7 +122,7 @@ export class OpenAIProvider implements LLMProvider {
     const raw = data.choices?.[0]?.message?.content?.trim() ?? ''
     const tags = parseTagsResponse(raw)
     if (tags.length === 0) {
-      throw new LLMError('OpenAI returned no parseable tags', true)
+      throw new LLMError('Provider returned no parseable tags', true)
     }
     return { tags }
   }
@@ -143,13 +141,13 @@ export class OpenAIProvider implements LLMProvider {
       })
     } catch (e) {
       throw new LLMError(
-        `OpenAI embeddings network error: ${e instanceof Error ? e.message : String(e)}`,
+        `Embeddings network error: ${e instanceof Error ? e.message : String(e)}`,
         true,
       )
     }
 
     if (!res.ok) {
-      throw await this.toLLMError(res, 'OpenAI embeddings request failed')
+      throw await this.toLLMError(res, 'Embeddings request failed')
     }
 
     const data = (await res.json()) as {
@@ -157,7 +155,7 @@ export class OpenAIProvider implements LLMProvider {
     }
     const vec = data.data?.[0]?.embedding
     if (!vec || vec.length === 0) {
-      throw new LLMError('OpenAI returned empty embedding', true)
+      throw new LLMError('Provider returned empty embedding', true)
     }
 
     const float32 = new Float32Array(vec)
@@ -206,14 +204,11 @@ export class OpenAIProvider implements LLMProvider {
         body: JSON.stringify(body),
       })
     } catch (e) {
-      throw new LLMError(
-        `OpenAI chat network error: ${e instanceof Error ? e.message : String(e)}`,
-        true,
-      )
+      throw new LLMError(`Chat network error: ${e instanceof Error ? e.message : String(e)}`, true)
     }
 
     if (!res.ok) {
-      throw await this.toLLMError(res, 'OpenAI chat request failed')
+      throw await this.toLLMError(res, 'Chat request failed')
     }
 
     return (await res.json()) as {

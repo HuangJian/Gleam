@@ -201,6 +201,8 @@ const INTELLIGENCE_CONFIG_QUERY = /* GraphQL */ `
     intelligenceConfig {
       provider
       model
+      embeddingModel
+      endpoint
       hasApiKey
     }
   }
@@ -211,6 +213,7 @@ const CONFIGURE_PROVIDER_MUTATION = /* GraphQL */ `
     $provider: String!
     $model: String!
     $embeddingModel: String!
+    $endpoint: String!
     $apiKey: String!
   ) {
     configureProvider(
@@ -218,11 +221,14 @@ const CONFIGURE_PROVIDER_MUTATION = /* GraphQL */ `
         provider: $provider
         model: $model
         embeddingModel: $embeddingModel
+        endpoint: $endpoint
         apiKey: $apiKey
       }
     ) {
       provider
       model
+      embeddingModel
+      endpoint
       success
     }
   }
@@ -469,7 +475,13 @@ export class ServerClient {
   async getIntelligenceConfig(): Promise<IntelligenceConfigView | null> {
     const resp = await this.request(INTELLIGENCE_CONFIG_QUERY, {})
     const data = resp.data?.intelligenceConfig as
-      | { provider: string; model: string; embeddingModel: string; hasApiKey: boolean }
+      | {
+          provider: string
+          model: string
+          embeddingModel: string
+          endpoint: string
+          hasApiKey: boolean
+        }
       | null
       | undefined
     if (!data) return null
@@ -477,6 +489,7 @@ export class ServerClient {
       provider: data.provider,
       model: data.model,
       embeddingModel: data.embeddingModel,
+      endpoint: data.endpoint,
       hasApiKey: data.hasApiKey,
     }
   }
@@ -489,16 +502,30 @@ export class ServerClient {
     provider: string,
     model: string,
     embeddingModel: string,
+    endpoint: string,
     apiKey: string,
-  ): Promise<{ provider: string; model: string; success: boolean }> {
+  ): Promise<{
+    provider: string
+    model: string
+    embeddingModel: string
+    endpoint: string
+    success: boolean
+  }> {
     const resp = await this.request(CONFIGURE_PROVIDER_MUTATION, {
       provider,
       model,
       embeddingModel,
+      endpoint,
       apiKey,
     })
     const data = resp.data?.configureProvider as
-      | { provider: string; model: string; success: boolean }
+      | {
+          provider: string
+          model: string
+          embeddingModel: string
+          endpoint: string
+          success: boolean
+        }
       | undefined
     if (!data) throw new Error('Missing configureProvider in response')
     return data

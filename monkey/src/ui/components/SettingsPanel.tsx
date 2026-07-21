@@ -17,6 +17,7 @@ interface SettingsPanelProps {
     provider: string,
     model: string,
     embeddingModel: string,
+    endpoint: string,
     apiKey: string,
   ) => Promise<void>
   onRemoveProvider: () => Promise<void>
@@ -40,9 +41,9 @@ export function SettingsPanel({
 
   // Intelligence config state
   const [aiConfig, setAiConfig] = useState<IntelligenceConfigView | null>(null)
-  const [provider, setProvider] = useState('openai')
-  const [model, setModel] = useState('gpt-4o-mini')
-  const [embeddingModel, setEmbeddingModel] = useState('text-embedding-3-small')
+  const [endpoint, setEndpoint] = useState('')
+  const [model, setModel] = useState('')
+  const [embeddingModel, setEmbeddingModel] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [aiSaving, setAiSaving] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
@@ -55,7 +56,7 @@ export function SettingsPanel({
     onGetIntelligenceConfig().then((config) => {
       setAiConfig(config)
       if (config) {
-        setProvider(config.provider)
+        setEndpoint(config.endpoint)
         setModel(config.model)
         setEmbeddingModel(config.embeddingModel)
       }
@@ -85,7 +86,7 @@ export function SettingsPanel({
     setAiSaving(true)
     setAiError(null)
     try {
-      await onConfigureProvider(provider, model, embeddingModel, apiKey)
+      await onConfigureProvider('openai-compatible', model, embeddingModel, endpoint, apiKey)
       // Refresh config
       const config = await onGetIntelligenceConfig()
       setAiConfig(config)
@@ -109,6 +110,9 @@ export function SettingsPanel({
       await onRemoveProvider()
       setAiConfig(null)
       setApiKey('')
+      setEndpoint('')
+      setModel('')
+      setEmbeddingModel('')
     } catch (e) {
       setAiError(e instanceof Error ? e.message : '移除失败')
     } finally {
@@ -140,186 +144,198 @@ export function SettingsPanel({
           </CloseButton>
         </PanelHeader>
 
-        <Section>
-          <SectionLabel>服务端地址</SectionLabel>
-          <UrlInput
-            type="url"
-            placeholder="http://localhost:3000/graphql"
-            value={urlInput}
-            onInput={(e: Event) => setUrlInput((e.target as HTMLInputElement).value)}
-          />
-          <ButtonRow>
-            <ActionButton onClick={handleSave} title="保存地址">
-              保存
-            </ActionButton>
-            <ActionButton
-              onClick={handleTest}
-              disabled={testing || !urlInput.trim()}
-              title="保存并测试连接"
-            >
-              {testing ? '测试中…' : '测试连接'}
-            </ActionButton>
-          </ButtonRow>
-          {testResult === 'success' && <TestResult $ok={true}>连接成功</TestResult>}
-          {testResult === 'fail' && <TestResult $ok={false}>连接失败，请检查地址或网络</TestResult>}
-        </Section>
-
-        <Section>
-          <SectionLabel>同步状态</SectionLabel>
-          <StatusRow>
-            <StatusDot $color={statusColor} />
-            <StatusText>{statusText}</StatusText>
-          </StatusRow>
-          <InfoGrid>
-            <InfoItem>
-              <InfoLabel>待上传</InfoLabel>
-              <InfoValue>{syncState.pendingCount} 条</InfoValue>
-            </InfoItem>
-            <InfoItem>
-              <InfoLabel>上次同步</InfoLabel>
-              <InfoValue>
-                {syncState.lastSyncAt
-                  ? new Date(syncState.lastSyncAt).toLocaleString([], {
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                  : '尚未同步'}
-              </InfoValue>
-            </InfoItem>
-          </InfoGrid>
-          {syncState.error && <ErrorText>{syncState.error}</ErrorText>}
-          <ActionButton
-            onClick={handleSync}
-            disabled={syncState.pendingCount === 0 || syncState.status === 'syncing'}
-            title="立即上传待同步的拾光"
-          >
-            立即同步
-          </ActionButton>
-        </Section>
-
-        {/* AI 观察者 Section */}
-        <Section>
-          <SectionLabel>AI 观察者</SectionLabel>
-
-          {aiConfig ? (
-            <>
-              <ConfigInfo>
-                <ConfigRow>
-                  <ConfigLabel>当前提供方:</ConfigLabel>
-                  <ConfigValue>{aiConfig.provider}</ConfigValue>
-                </ConfigRow>
-                <ConfigRow>
-                  <ConfigLabel>当前模型:</ConfigLabel>
-                  <ConfigValue>{aiConfig.model}</ConfigValue>
-                </ConfigRow>
-                <ConfigRow>
-                  <ConfigLabel>当前嵌入模型:</ConfigLabel>
-                  <ConfigValue>{aiConfig.embeddingModel}</ConfigValue>
-                </ConfigRow>
-                <ConfigRow>
-                  <ConfigLabel>API Key:</ConfigLabel>
-                  <ConfigValue>{aiConfig.hasApiKey ? '已配置 ✓' : '未配置'}</ConfigValue>
-                </ConfigRow>
-              </ConfigInfo>
-
-              <PrivacyNotice>
-                ⚠
-                修改嵌入模型会触发所有拾光的向量重新生成（关联也会重置）。修改模型或提供方需要重新输入
-                API Key。
-              </PrivacyNotice>
-
-              <ProviderSelect
-                value={provider}
-                onChange={(e: Event) => setProvider((e.target as HTMLSelectElement).value)}
-              >
-                <option value="openai">openai</option>
-              </ProviderSelect>
-              <ModelInput
-                type="text"
-                placeholder="模型名称"
-                value={model}
-                onInput={(e: Event) => setModel((e.target as HTMLInputElement).value)}
-              />
-              <EmbeddingModelInput
-                type="text"
-                placeholder="嵌入模型名称"
-                value={embeddingModel}
-                onInput={(e: Event) => setEmbeddingModel((e.target as HTMLInputElement).value)}
-              />
-              <ApiKeyInput
-                type="password"
-                placeholder="需重新输入 API Key"
-                value={apiKey}
-                onInput={(e: Event) => setApiKey((e.target as HTMLInputElement).value)}
+        <Columns>
+          {/* Left column: Server & Sync */}
+          <LeftColumn>
+            <Section>
+              <SectionLabel>服务端地址</SectionLabel>
+              <UrlInput
+                type="url"
+                placeholder="http://localhost:3000/graphql"
+                value={urlInput}
+                onInput={(e: Event) => setUrlInput((e.target as HTMLInputElement).value)}
               />
               <ButtonRow>
-                <ActionButton
-                  onClick={handleConfigureProvider}
-                  disabled={aiSaving || !apiKey.trim()}
-                  title="更新配置"
-                >
-                  {aiSaving ? '验证中…' : '更新配置'}
+                <ActionButton onClick={handleSave} title="保存地址">
+                  保存
                 </ActionButton>
-                <ActionButton onClick={handleRemoveProvider} disabled={aiRemoving} title="删除配置">
-                  {aiRemoving ? '删除中…' : '删除配置'}
+                <ActionButton
+                  onClick={handleTest}
+                  disabled={testing || !urlInput.trim()}
+                  title="保存并测试连接"
+                >
+                  {testing ? '测试中…' : '测试连接'}
                 </ActionButton>
               </ButtonRow>
-            </>
-          ) : (
-            <>
-              <ConfigInfo>尚未配置 LLM 提供方。</ConfigInfo>
-              <ConfigInfo>
-                启用后，AI 将在后台自动为你的拾光生成摘要、标签，并发现语义关联。
-              </ConfigInfo>
+              {testResult === 'success' && <TestResult $ok={true}>连接成功</TestResult>}
+              {testResult === 'fail' && (
+                <TestResult $ok={false}>连接失败，请检查地址或网络</TestResult>
+              )}
+            </Section>
 
-              <PrivacyNotice>
-                ⚠ 你的拾光内容（thought、source 等）将被发送到外部 LLM 服务进行语义分析。
-              </PrivacyNotice>
-
-              <ProviderSelect
-                value={provider}
-                onChange={(e: Event) => setProvider((e.target as HTMLSelectElement).value)}
+            <Section>
+              <SectionLabel>同步状态</SectionLabel>
+              <StatusRow>
+                <StatusDot $color={statusColor} />
+                <StatusText>{statusText}</StatusText>
+              </StatusRow>
+              <InfoGrid>
+                <InfoItem>
+                  <InfoLabel>待上传</InfoLabel>
+                  <InfoValue>{syncState.pendingCount} 条</InfoValue>
+                </InfoItem>
+                <InfoItem>
+                  <InfoLabel>上次同步</InfoLabel>
+                  <InfoValue>
+                    {syncState.lastSyncAt
+                      ? new Date(syncState.lastSyncAt).toLocaleString([], {
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : '尚未同步'}
+                  </InfoValue>
+                </InfoItem>
+              </InfoGrid>
+              {syncState.error && <ErrorText>{syncState.error}</ErrorText>}
+              <ActionButton
+                onClick={handleSync}
+                disabled={syncState.pendingCount === 0 || syncState.status === 'syncing'}
+                title="立即上传待同步的拾光"
               >
-                <option value="openai">openai</option>
-              </ProviderSelect>
-              <ModelInput
-                type="text"
-                placeholder="模型名称"
-                value={model}
-                onInput={(e: Event) => setModel((e.target as HTMLInputElement).value)}
-              />
-              <EmbeddingModelInput
-                type="text"
-                placeholder="嵌入模型名称"
-                value={embeddingModel}
-                onInput={(e: Event) => setEmbeddingModel((e.target as HTMLInputElement).value)}
-              />
-              <ApiKeyInput
-                type="password"
-                placeholder="API Key"
-                value={apiKey}
-                onInput={(e: Event) => setApiKey((e.target as HTMLInputElement).value)}
-              />
-              <ButtonRow>
-                <ActionButton
-                  onClick={handleConfigureProvider}
-                  disabled={aiSaving || !apiKey.trim()}
-                  title="验证并保存"
-                >
-                  {aiSaving ? '验证中…' : '验证并保存'}
-                </ActionButton>
-              </ButtonRow>
-            </>
-          )}
+                立即同步
+              </ActionButton>
+            </Section>
 
-          {aiError && <ErrorText>{aiError}</ErrorText>}
-        </Section>
+            <HelpText>
+              配置服务端地址后，捕获的拾光会自动上传至服务器归档。服务端不可用时，拾光会保存在本地缓存，待恢复连接后自动同步。
+            </HelpText>
+          </LeftColumn>
 
-        <HelpText>
-          配置服务端地址后，捕获的拾光会自动上传至服务器归档。服务端不可用时，拾光会保存在本地缓存，待恢复连接后自动同步。
-        </HelpText>
+          {/* Right column: AI Config */}
+          <RightColumn>
+            <Section>
+              <SectionLabel>AI 配置</SectionLabel>
+
+              {aiConfig ? (
+                <>
+                  <ConfigInfo>
+                    <ConfigRow>
+                      <ConfigLabel>Endpoint:</ConfigLabel>
+                      <ConfigValue>{aiConfig.endpoint}</ConfigValue>
+                    </ConfigRow>
+                    <ConfigRow>
+                      <ConfigLabel>Chat 模型:</ConfigLabel>
+                      <ConfigValue>{aiConfig.model}</ConfigValue>
+                    </ConfigRow>
+                    <ConfigRow>
+                      <ConfigLabel>Embedding 模型:</ConfigLabel>
+                      <ConfigValue>{aiConfig.embeddingModel}</ConfigValue>
+                    </ConfigRow>
+                    <ConfigRow>
+                      <ConfigLabel>API Key:</ConfigLabel>
+                      <ConfigValue>{aiConfig.hasApiKey ? '已配置 ✓' : '未配置'}</ConfigValue>
+                    </ConfigRow>
+                  </ConfigInfo>
+
+                  <PrivacyNotice>
+                    ⚠ 修改嵌入模型会触发所有拾光的向量重新生成（关联也会重置）。修改模型或 endpoint
+                    需要重新输入 API Key。
+                  </PrivacyNotice>
+
+                  <EndpointInput
+                    type="url"
+                    placeholder="https://api.openai.com"
+                    value={endpoint}
+                    onInput={(e: Event) => setEndpoint((e.target as HTMLInputElement).value)}
+                  />
+                  <ModelInput
+                    type="text"
+                    placeholder="chat 模型名称，如 gpt-4o-mini"
+                    value={model}
+                    onInput={(e: Event) => setModel((e.target as HTMLInputElement).value)}
+                  />
+                  <EmbeddingModelInput
+                    type="text"
+                    placeholder="embedding 模型名称，如 text-embedding-3-small"
+                    value={embeddingModel}
+                    onInput={(e: Event) => setEmbeddingModel((e.target as HTMLInputElement).value)}
+                  />
+                  <ApiKeyInput
+                    type="text"
+                    placeholder="需重新输入 API Key"
+                    value={apiKey}
+                    onInput={(e: Event) => setApiKey((e.target as HTMLInputElement).value)}
+                  />
+                  <ButtonRow>
+                    <ActionButton
+                      onClick={handleConfigureProvider}
+                      disabled={aiSaving || !apiKey.trim()}
+                      title="更新配置"
+                    >
+                      {aiSaving ? '验证中…' : '更新配置'}
+                    </ActionButton>
+                    <ActionButton
+                      onClick={handleRemoveProvider}
+                      disabled={aiRemoving}
+                      title="删除配置"
+                    >
+                      {aiRemoving ? '删除中…' : '删除配置'}
+                    </ActionButton>
+                  </ButtonRow>
+                </>
+              ) : (
+                <>
+                  <ConfigInfo>尚未配置 LLM 提供方。</ConfigInfo>
+                  <ConfigInfo>
+                    启用后，AI 将在后台自动为你的拾光生成摘要、标签，并发现语义关联。
+                  </ConfigInfo>
+
+                  <PrivacyNotice>
+                    ⚠ 你的拾光内容（thought、source 等）将被发送到外部 LLM 服务进行语义分析。
+                  </PrivacyNotice>
+
+                  <EndpointInput
+                    type="url"
+                    placeholder="https://api.openai.com"
+                    value={endpoint}
+                    onInput={(e: Event) => setEndpoint((e.target as HTMLInputElement).value)}
+                  />
+                  <ModelInput
+                    type="text"
+                    placeholder="chat 模型名称，如 gpt-4o-mini"
+                    value={model}
+                    onInput={(e: Event) => setModel((e.target as HTMLInputElement).value)}
+                  />
+                  <EmbeddingModelInput
+                    type="text"
+                    placeholder="embedding 模型名称，如 text-embedding-3-small"
+                    value={embeddingModel}
+                    onInput={(e: Event) => setEmbeddingModel((e.target as HTMLInputElement).value)}
+                  />
+                  <ApiKeyInput
+                    type="text"
+                    placeholder="API Key"
+                    value={apiKey}
+                    onInput={(e: Event) => setApiKey((e.target as HTMLInputElement).value)}
+                  />
+                  <ButtonRow>
+                    <ActionButton
+                      onClick={handleConfigureProvider}
+                      disabled={aiSaving || !apiKey.trim()}
+                      title="验证并保存"
+                    >
+                      {aiSaving ? '验证中…' : '验证并保存'}
+                    </ActionButton>
+                  </ButtonRow>
+                </>
+              )}
+
+              {aiError && <ErrorText>{aiError}</ErrorText>}
+            </Section>
+          </RightColumn>
+        </Columns>
       </Panel>
     </Overlay>
   )
@@ -357,8 +373,8 @@ const Panel = styled.div`
   background: ${theme.colors.bg.base};
   border-radius: 16px;
   box-shadow: ${theme.shadows.popover};
-  width: 440px;
-  max-width: 90vw;
+  width: 80vw;
+  max-width: 80vw;
   max-height: 85vh;
   overflow-y: auto;
   padding: 24px;
@@ -393,6 +409,29 @@ const CloseButton = styled.button`
   &:hover {
     color: ${theme.colors.text.primary};
   }
+`
+
+const Columns = styled.div`
+  display: flex;
+  gap: 24px;
+
+  @media (max-width: 700px) {
+    flex-direction: column;
+  }
+`
+
+const LeftColumn = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+`
+
+const RightColumn = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 `
 
 const Section = styled.div`
@@ -552,7 +591,7 @@ const PrivacyNotice = styled.div`
   line-height: 1.5;
 `
 
-const ProviderSelect = styled.select`
+const EndpointInput = styled.input`
   width: 100%;
   padding: 8px 12px;
   border: 1px solid ${theme.colors.border.light};
@@ -562,12 +601,15 @@ const ProviderSelect = styled.select`
   color: ${theme.colors.text.primary};
   background: ${theme.colors.bg.input};
   outline: none;
-  cursor: pointer;
   box-sizing: border-box;
   transition: ${theme.animations.transition};
 
   &:focus {
     border-color: ${theme.colors.border.focus};
+  }
+
+  &::placeholder {
+    color: ${theme.colors.text.muted};
   }
 `
 
@@ -587,6 +629,10 @@ const ModelInput = styled.input`
   &:focus {
     border-color: ${theme.colors.border.focus};
   }
+
+  &::placeholder {
+    color: ${theme.colors.text.muted};
+  }
 `
 
 const EmbeddingModelInput = styled.input`
@@ -604,6 +650,10 @@ const EmbeddingModelInput = styled.input`
 
   &:focus {
     border-color: ${theme.colors.border.focus};
+  }
+
+  &::placeholder {
+    color: ${theme.colors.text.muted};
   }
 `
 

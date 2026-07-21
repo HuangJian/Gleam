@@ -6,7 +6,7 @@
  *   NVIDIA_LLM_API_KEY=<key> bun run backend/scripts/validate-tags.ts
  *
  * The script mirrors the request shape used by the production
- * `OpenAIProvider.generateTags` (see backend/src/gateway/openai-provider.ts)
+ * `OpenAICompatibleProvider.generateTags` (see backend/src/gateway/openai-compatible-provider.ts)
  * and loads the real Tags prompt from backend/prompts/tags/v1.md
  * (the same file the PromptRegistry resolves at runtime), so it validates
  * the actual prompt behavior rather than a copy.
@@ -42,7 +42,7 @@ interface LLMInput {
 
 // ── Helpers ────────────────────────────────────────────
 
-/** Mirrors `buildUserContent` in openai-provider.ts. */
+/** Mirrors `buildUserContent` in openai-compatible-provider.ts. */
 function buildUserContent(input: LLMInput): string {
   const parts: string[] = []
   parts.push(`Thought: ${input.thought}`)
@@ -53,7 +53,7 @@ function buildUserContent(input: LLMInput): string {
 }
 
 /**
- * Mirrors `parseTagsResponse` in openai-provider.ts: accepts a JSON array,
+ * Mirrors `parseTagsResponse` in openai-compatible-provider.ts: accepts a JSON array,
  * comma-separated, or line-separated tags; strips a leading `#`.
  */
 function parseTagsResponse(raw: string): string[] {

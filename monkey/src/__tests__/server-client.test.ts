@@ -267,7 +267,15 @@ describe('ServerClient', () => {
 
   test('getIntelligenceConfig returns config view', async () => {
     setMockResponse(200, {
-      data: { intelligenceConfig: { provider: 'openai', model: 'gpt-4o-mini', hasApiKey: true } },
+      data: {
+        intelligenceConfig: {
+          provider: 'openai',
+          model: 'gpt-4o-mini',
+          embeddingModel: 'text-embedding-3-small',
+          endpoint: 'https://api.openai.com',
+          hasApiKey: true,
+        },
+      },
     })
 
     const config = await client.getIntelligenceConfig()
@@ -288,13 +296,22 @@ describe('ServerClient', () => {
 
   test('configureProvider sends correct mutation', async () => {
     setMockResponse(200, {
-      data: { configureProvider: { provider: 'openai', model: 'gpt-4o-mini', success: true } },
+      data: {
+        configureProvider: {
+          provider: 'openai',
+          model: 'gpt-4o-mini',
+          embeddingModel: 'text-embedding-3-small',
+          endpoint: 'https://api.openai.com',
+          success: true,
+        },
+      },
     })
 
     const result = await client.configureProvider(
       'openai',
       'gpt-4o-mini',
       'text-embedding-3-small',
+      'https://api.openai.com',
       'sk-xxx',
     )
     expect(result.provider).toBe('openai')
@@ -306,6 +323,7 @@ describe('ServerClient', () => {
     expect(body.variables.provider).toBe('openai')
     expect(body.variables.model).toBe('gpt-4o-mini')
     expect(body.variables.embeddingModel).toBe('text-embedding-3-small')
+    expect(body.variables.endpoint).toBe('https://api.openai.com')
     expect(body.variables.apiKey).toBe('sk-xxx')
   })
 

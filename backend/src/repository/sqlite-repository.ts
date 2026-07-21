@@ -807,6 +807,7 @@ export class SqliteRepository implements IRepository, IIntelligenceRepository {
       provider: row.provider,
       model: row.model,
       embeddingModel: row.embeddingModel,
+      endpoint: row.endpoint,
       encryptedApiKey: row.encryptedApiKey,
       apiKeyIv: row.apiKeyIv,
       updatedAt: row.updatedAt,
@@ -824,6 +825,7 @@ export class SqliteRepository implements IRepository, IIntelligenceRepository {
           provider: config.provider,
           model: config.model,
           embeddingModel: config.embeddingModel,
+          endpoint: config.endpoint,
           encryptedApiKey: config.encryptedApiKey,
           apiKeyIv: config.apiKeyIv,
           updatedAt: now,
@@ -860,6 +862,7 @@ export class SqliteRepository implements IRepository, IIntelligenceRepository {
       provider: row.provider,
       model: row.model,
       embeddingModel: row.embeddingModel,
+      endpoint: row.endpoint,
       hasApiKey: row.encryptedApiKey.length > 0,
     }
   }

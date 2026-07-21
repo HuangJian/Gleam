@@ -70,6 +70,7 @@ const CONFIGURE_PROVIDER = /* GraphQL */ `
     $provider: String!
     $model: String!
     $embeddingModel: String!
+    $endpoint: String!
     $apiKey: String!
   ) {
     configureProvider(
@@ -77,11 +78,14 @@ const CONFIGURE_PROVIDER = /* GraphQL */ `
         provider: $provider
         model: $model
         embeddingModel: $embeddingModel
+        endpoint: $endpoint
         apiKey: $apiKey
       }
     ) {
       provider
       model
+      embeddingModel
+      endpoint
       success
     }
   }
@@ -111,12 +115,13 @@ async function configure(
   provider: string,
   model: string,
   embeddingModel: string,
+  endpoint: string,
   apiKey: string,
 ): Promise<void> {
   const res = await graphql({
     schema: schema as GraphQLSchema,
     source: CONFIGURE_PROVIDER,
-    variableValues: { provider, model, embeddingModel, apiKey },
+    variableValues: { provider, model, embeddingModel, endpoint, apiKey },
     contextValue: context,
   })
   if (res.errors && res.errors.length > 0) {
@@ -126,7 +131,13 @@ async function configure(
 
 describe('configureProvider resolver', () => {
   test('persists embeddingModel on first save', async () => {
-    await configure('openai', 'gpt-4o-mini', 'text-embedding-3-small', 'sk-test')
+    await configure(
+      'openai',
+      'gpt-4o-mini',
+      'text-embedding-3-small',
+      'https://api.openai.com',
+      'sk-test',
+    )
 
     const stored = await repo.getIntelligenceConfig()
     expect(stored).not.toBeNull()
@@ -134,7 +145,13 @@ describe('configureProvider resolver', () => {
   })
 
   test('same embeddingModel on update does NOT reset embeddings', async () => {
-    await configure('openai', 'gpt-4o-mini', 'text-embedding-3-small', 'sk-test')
+    await configure(
+      'openai',
+      'gpt-4o-mini',
+      'text-embedding-3-small',
+      'https://api.openai.com',
+      'sk-test',
+    )
 
     // Seed a gleam with a completed embedding.
     await repo.appendGleams([makeGleam('01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f')])
@@ -142,7 +159,13 @@ describe('configureProvider resolver', () => {
     await repo.setArtifactStatus('01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f', 'embedding', 'completed')
 
     // Re-configure with the SAME embedding model.
-    await configure('openai', 'gpt-4o-mini', 'text-embedding-3-small', 'sk-test2')
+    await configure(
+      'openai',
+      'gpt-4o-mini',
+      'text-embedding-3-small',
+      'https://api.openai.com',
+      'sk-test2',
+    )
 
     const pending = await repo.findPendingArtifacts(100)
     const embeddingPending = pending.filter((p) => p.artifact === 'embedding')
@@ -150,14 +173,26 @@ describe('configureProvider resolver', () => {
   })
 
   test('different embeddingModel on update DOES reset all embeddings', async () => {
-    await configure('openai', 'gpt-4o-mini', 'text-embedding-3-small', 'sk-test')
+    await configure(
+      'openai',
+      'gpt-4o-mini',
+      'text-embedding-3-small',
+      'https://api.openai.com',
+      'sk-test',
+    )
 
     await repo.appendGleams([makeGleam('01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f')])
     await repo.createGleamAI('01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f')
     await repo.setArtifactStatus('01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f', 'embedding', 'completed')
 
     // Re-configure with a DIFFERENT embedding model.
-    await configure('openai', 'gpt-4o-mini', 'text-embedding-3-large', 'sk-test2')
+    await configure(
+      'openai',
+      'gpt-4o-mini',
+      'text-embedding-3-large',
+      'https://api.openai.com',
+      'sk-test2',
+    )
 
     const stored = await repo.getIntelligenceConfig()
     expect(stored!.embeddingModel).toBe('text-embedding-3-large')
@@ -168,7 +203,13 @@ describe('configureProvider resolver', () => {
   })
 
   test('getIntelligenceConfigView exposes resolved embeddingModel', async () => {
-    await configure('openai', 'gpt-4o-mini', 'text-embedding-3-small', 'sk-test')
+    await configure(
+      'openai',
+      'gpt-4o-mini',
+      'text-embedding-3-small',
+      'https://api.openai.com',
+      'sk-test',
+    )
     const view = await repo.getIntelligenceConfigView()
     expect(view!.embeddingModel).toBe('text-embedding-3-small')
   })

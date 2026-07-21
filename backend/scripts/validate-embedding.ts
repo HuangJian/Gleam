@@ -6,7 +6,7 @@
  *   NVIDIA_LLM_API_KEY=<key> bun run backend/scripts/validate-embedding.ts
  *
  * The script mirrors the text-construction logic used by the production
- * `OpenAIProvider.generateEmbedding` (see backend/src/gateway/openai-provider.ts)
+ * `OpenAICompatibleProvider.generateEmbedding` (see backend/src/gateway/openai-compatible-provider.ts)
  * so the validated request shape matches what the Intelligence pipeline sends.
  *
  * It performs no database writes — it only exercises the model endpoint and
@@ -40,7 +40,7 @@ interface EmbeddingResponse {
 
 // ── Helpers ────────────────────────────────────────────
 
-/** Mirrors `buildEmbeddingText` in openai-provider.ts (thought weighted 3×). */
+/** Mirrors `buildEmbeddingText` in openai-compatible-provider.ts (thought weighted 3×). */
 const THOUGHT_EMBEDDING_WEIGHT = 3
 
 function buildEmbeddingText(input: LLMInput): string {

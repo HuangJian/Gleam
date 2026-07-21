@@ -93,7 +93,13 @@ function createMockServerClient(overrides: Partial<ServerClient> = {}): ServerCl
     renameTag: mock(() => Promise.resolve(0)),
     getIntelligenceConfig: mock(() => Promise.resolve<IntelligenceConfigView | null>(null)),
     configureProvider: mock(() =>
-      Promise.resolve({ provider: 'openai', model: 'gpt-4o-mini', success: true }),
+      Promise.resolve({
+        provider: 'openai',
+        model: 'gpt-4o-mini',
+        embeddingModel: 'text-embedding-3-small',
+        endpoint: 'https://api.openai.com',
+        success: true,
+      }),
     ),
     removeProvider: mock(() => Promise.resolve(true)),
     removeTag: mock(() => Promise.resolve(true)),
@@ -456,6 +462,7 @@ describe('SyncService', () => {
       provider: 'openai',
       model: 'gpt-4o-mini',
       embeddingModel: 'text-embedding-3-small',
+      endpoint: 'https://api.openai.com',
       hasApiKey: true,
     }
     serverClient = createMockServerClient({

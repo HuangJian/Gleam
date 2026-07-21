@@ -15,7 +15,7 @@
  *                                    │
  *                         ┌──────────┴──────────┐
  *                         ▼                     ▼
- *                   OpenAIProvider         FutureProvider
+ *                   OpenAICompatibleProvider  FutureProvider
  */
 
 import type { Source } from '../domain/gleam'

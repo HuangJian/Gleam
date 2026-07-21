@@ -214,6 +214,7 @@ const IntelligenceConfigType = builder
       provider: t.exposeString('provider'),
       model: t.exposeString('model'),
       embeddingModel: t.exposeString('embeddingModel'),
+      endpoint: t.exposeString('endpoint'),
       hasApiKey: t.exposeBoolean('hasApiKey'),
     }),
   })
@@ -340,6 +341,7 @@ const ConfigureProviderInput = builder.inputType('ConfigureProviderInput', {
     provider: t.string({ required: true }),
     model: t.string({ required: true }),
     embeddingModel: t.string({ required: true }),
+    endpoint: t.string({ required: true }),
     apiKey: t.string({ required: true }),
   }),
 })
@@ -406,11 +408,19 @@ const RenameTagPayloadType = builder
   })
 
 const ConfigureProviderPayloadType = builder
-  .objectRef<{ provider: string; model: string; success: boolean }>('ConfigureProviderPayload')
+  .objectRef<{
+    provider: string
+    model: string
+    embeddingModel: string
+    endpoint: string
+    success: boolean
+  }>('ConfigureProviderPayload')
   .implement({
     fields: (t) => ({
       provider: t.exposeString('provider'),
       model: t.exposeString('model'),
+      embeddingModel: t.exposeString('embeddingModel'),
+      endpoint: t.exposeString('endpoint'),
       success: t.exposeBoolean('success'),
     }),
   })
@@ -568,7 +578,7 @@ builder.mutationType({
         input: t.arg({ type: ConfigureProviderInput, required: true }),
       },
       resolve: async (_, args, ctx) => {
-        const { provider, model, embeddingModel, apiKey } = args.input
+        const { provider, model, embeddingModel, endpoint, apiKey } = args.input
 
         if (!hasEncryptionSecret()) {
           throw new Error(
@@ -579,7 +589,7 @@ builder.mutationType({
 
         // Validate before persisting — invalid credentials are rejected
         // immediately. Only usable provider configurations are stored.
-        const probe = createProviderForValidation(provider, model, apiKey, embeddingModel)
+        const probe = createProviderForValidation(provider, model, apiKey, embeddingModel, endpoint)
         try {
           await probe.validateConfig()
         } catch (e) {
@@ -587,6 +597,7 @@ builder.mutationType({
             provider,
             model,
             embeddingModel,
+            endpoint,
             error: e instanceof Error ? e.message : String(e),
           })
           throw new Error(
@@ -615,13 +626,14 @@ builder.mutationType({
           provider,
           model,
           embeddingModel,
+          endpoint,
           encryptedApiKey: encrypted.ciphertext,
           apiKeyIv: encrypted.iv,
           updatedAt: new Date().toISOString(),
         })
 
-        logger.info('Provider configured', { provider, model, embeddingModel })
-        return { provider, model, success: true }
+        logger.info('Provider configured', { provider, model, embeddingModel, endpoint })
+        return { provider, model, embeddingModel, endpoint, success: true }
       },
     }),
 

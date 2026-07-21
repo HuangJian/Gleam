@@ -263,7 +263,7 @@ describe('Scheduler recovery (recoverRunningObservations)', () => {
  * Saves a valid IntelligenceConfig to the repository.
  *
  * The API key is encrypted with GLEAM_BACKEND_SECRET (set in beforeAll). The
- * scheduler will decrypt it and construct an OpenAIProvider — but
+ * scheduler will decrypt it and construct an OpenAICompatibleProvider — but
  * the TrackingPipeline ignores the provider, so no HTTP requests
  * are made.
  */
@@ -273,6 +273,7 @@ async function saveProviderConfig(repository: SqliteRepository): Promise<void> {
     provider: 'openai',
     model: 'gpt-4o-mini',
     embeddingModel: 'text-embedding-3-small',
+    endpoint: 'https://api.openai.com',
     encryptedApiKey: encrypted.ciphertext,
     apiKeyIv: encrypted.iv,
     updatedAt: new Date().toISOString(),

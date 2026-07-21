@@ -275,9 +275,10 @@ export class SyncService {
     provider: string,
     model: string,
     embeddingModel: string,
+    endpoint: string,
     apiKey: string,
   ): Promise<void> {
-    await this.serverClient.configureProvider(provider, model, embeddingModel, apiKey)
+    await this.serverClient.configureProvider(provider, model, embeddingModel, endpoint, apiKey)
   }
 
   /** Removes provider configuration. */

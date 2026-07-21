@@ -1,5 +1,5 @@
 import type { LLMProvider } from './llm-provider'
-import { OpenAIProvider } from './openai-provider'
+import { OpenAICompatibleProvider } from './openai-compatible-provider'
 import { decrypt } from '../config/encryption'
 import type { IntelligenceConfig } from '../domain/gleam-ai'
 import { LLMError } from './llm-provider'
@@ -21,10 +21,12 @@ export function createProvider(config: IntelligenceConfig): LLMProvider {
 
   switch (config.provider) {
     case 'openai':
-      return new OpenAIProvider({
+    case 'openai-compatible':
+      return new OpenAICompatibleProvider({
         apiKey,
         model: config.model,
         embeddingModel: config.embeddingModel,
+        endpoint: config.endpoint,
       })
     default:
       throw new LLMError(`Unknown provider: ${config.provider}`, false)
@@ -36,7 +38,7 @@ export function createProvider(config: IntelligenceConfig): LLMProvider {
  * before persisting the configuration. Validates that the credentials
  * are usable.
  *
- * `provider`, `model`, and `embeddingModel` come from the GraphQL input;
+ * `provider`, `model`, `embeddingModel`, and `endpoint` come from the GraphQL input;
  * `apiKey` is the plaintext key entered by the user (not yet encrypted).
  * The embedding model is always user-supplied — there is no server default.
  */
@@ -45,13 +47,16 @@ export function createProviderForValidation(
   model: string,
   apiKey: string,
   embeddingModel: string,
+  endpoint: string,
 ): LLMProvider {
   switch (provider) {
     case 'openai':
-      return new OpenAIProvider({
+    case 'openai-compatible':
+      return new OpenAICompatibleProvider({
         apiKey,
         model,
         embeddingModel,
+        endpoint,
       })
     default:
       throw new LLMError(`Unknown provider: ${provider}`, false)

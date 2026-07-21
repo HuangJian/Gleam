@@ -487,6 +487,7 @@ describe('SqliteRepository intelligence config', () => {
       provider: string
       model: string
       embeddingModel: string
+      endpoint: string
       encryptedApiKey: string
       apiKeyIv: string
     }> = {},
@@ -495,6 +496,7 @@ describe('SqliteRepository intelligence config', () => {
       provider: 'openai',
       model: 'gpt-4o-mini',
       embeddingModel: 'text-embedding-3-small',
+      endpoint: 'https://api.openai.com',
       encryptedApiKey: 'enc',
       apiKeyIv: 'iv',
       updatedAt: new Date().toISOString(),

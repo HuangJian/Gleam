@@ -140,6 +140,9 @@ function createTablesManually(db: DB, sqlite: Database): void {
     api_key_iv TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`)
+  // Ensure embedding_model and endpoint exist on pre-existing databases.
+  ensureColumn(sqlite, 'intelligence_config', 'embedding_model', "TEXT NOT NULL DEFAULT ''")
+  ensureColumn(sqlite, 'intelligence_config', 'endpoint', "TEXT NOT NULL DEFAULT ''")
 
   db.run(sql`CREATE TABLE IF NOT EXISTS prompt_history (
     capability TEXT NOT NULL,

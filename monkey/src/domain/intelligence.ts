@@ -49,6 +49,7 @@ export interface IntelligenceConfigView {
   model: string
   /** Resolved embedding model (provider default applied if unset). */
   embeddingModel: string
+  endpoint: string
   hasApiKey: boolean
 }
 

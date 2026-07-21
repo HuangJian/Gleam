@@ -1,0 +1,1 @@
+ALTER TABLE `intelligence_config` ADD COLUMN `endpoint` text NOT NULL DEFAULT '';

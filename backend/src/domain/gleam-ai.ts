@@ -147,6 +147,7 @@ export interface IntelligenceConfig {
   model: string
   /** Embedding model. Always user-supplied — no server default. */
   embeddingModel: string
+  endpoint: string
   encryptedApiKey: string // base64 ciphertext
   apiKeyIv: string // base64 IV
   updatedAt: string
@@ -162,6 +163,7 @@ export interface IntelligenceConfigView {
   model: string
   /** Embedding model (always user-supplied). */
   embeddingModel: string
+  endpoint: string
   hasApiKey: boolean
 }
 
