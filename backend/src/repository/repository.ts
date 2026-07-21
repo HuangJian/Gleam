@@ -225,4 +225,6 @@ export interface IIntelligenceRepository {
   ): Promise<void>
 
   getPromptSnapshot(capability: string, version: string): Promise<PromptSnapshot | null>
+
+  getPromptSnapshotsForCapability(capability: string): Promise<PromptSnapshot[]>
 }

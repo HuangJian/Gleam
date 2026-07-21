@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, real, blob } from 'drizzle-orm/sqlite-core'
+import { integer, sqliteTable, text, real, blob, primaryKey } from 'drizzle-orm/sqlite-core'
 
 /**
  * `gleams` — core, immutable table.
@@ -137,13 +137,23 @@ export const intelligenceConfig = sqliteTable('intelligence_config', {
  * Snapshots are never consulted during normal execution — their purpose
  * is historical explainability of previously generated artifacts.
  */
-export const promptHistory = sqliteTable('prompt_history', {
-  capability: text('capability').notNull(),
-  version: text('version').notNull(),
-  content: text('content').notNull(),
-  checksum: text('checksum').notNull(),
-  createdAt: text('created_at').notNull(),
-})
+export const promptHistory = sqliteTable(
+  'prompt_history',
+  {
+    capability: text('capability').notNull(),
+    version: text('version').notNull(),
+    content: text('content').notNull(),
+    checksum: text('checksum').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    // (capability, version) uniquely identifies a snapshot. The registry's
+    // savePromptSnapshot() relies on this for idempotent archiving via
+    // onConflictDoNothing(); without it, every process restart re-inserts
+    // the same v1 prompts as duplicates.
+    primaryKey({ columns: [table.capability, table.version] }),
+  ],
+)
 
 /**
  * `repository_ai` — placeholder for future repository-level semantic

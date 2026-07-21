@@ -43,6 +43,13 @@
       "when": 1784590833333,
       "tag": "0005_add_reasoning_suppression",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1784625006065,
+      "tag": "0006_dedupe_prompt_history_pk",
+      "breakpoints": true
     }
   ]
 }

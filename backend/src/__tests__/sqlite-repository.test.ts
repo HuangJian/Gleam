@@ -556,3 +556,28 @@ describe('SqliteRepository intelligence config', () => {
     expect(embeddingIds).toEqual(['01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f'])
   })
 })
+
+// ── savePromptSnapshot ──────────────────────────────────
+
+describe('SqliteRepository.savePromptSnapshot', () => {
+  test('does not duplicate a (capability, version) across repeated saves', async () => {
+    // Simulates the process restarting: main.ts calls stageSnapshots()
+    // once per boot, which re-stages the same latest v1 prompts.
+    await repo.savePromptSnapshot('summary', 'v1', 'content-a', 'checksum-a')
+    await repo.savePromptSnapshot('summary', 'v1', 'content-a', 'checksum-a')
+    await repo.savePromptSnapshot('summary', 'v1', 'content-a', 'checksum-a')
+
+    const rows = await repo.getPromptSnapshotsForCapability('summary')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].version).toBe('v1')
+    expect(rows[0].checksum).toBe('checksum-a')
+  })
+
+  test('keeps distinct versions as separate rows', async () => {
+    await repo.savePromptSnapshot('tags', 'v1', 'content-v1', 'checksum-v1')
+    await repo.savePromptSnapshot('tags', 'v2', 'content-v2', 'checksum-v2')
+
+    const rows = await repo.getPromptSnapshotsForCapability('tags')
+    expect(rows).toHaveLength(2)
+  })
+})

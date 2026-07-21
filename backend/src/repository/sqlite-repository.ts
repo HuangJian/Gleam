@@ -908,6 +908,21 @@ export class SqliteRepository implements IRepository, IIntelligenceRepository {
     }
   }
 
+  async getPromptSnapshotsForCapability(capability: string): Promise<PromptSnapshot[]> {
+    const rows = this.db
+      .select()
+      .from(promptHistory)
+      .where(eq(promptHistory.capability, capability))
+      .all()
+    return rows.map((row) => ({
+      capability: row.capability,
+      version: row.version,
+      content: row.content,
+      checksum: row.checksum,
+      createdAt: row.createdAt,
+    }))
+  }
+
   // ── Helpers ──────────────────────────────────────────
 
   private joinGleam(row: typeof gleams.$inferSelect): Gleam {
