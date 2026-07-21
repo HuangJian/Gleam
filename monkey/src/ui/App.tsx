@@ -63,11 +63,17 @@ export function App({ repository, syncService, shadowHost }: AppProps) {
     }
     setTimelineGroups(groupByDate(items))
 
-    // Refresh viewingGleam's intelligence from the new timeline data
-    if (viewingGleam) {
-      const updated = items.find((i) => i.gleam.id === viewingGleam.gleam.id)
-      if (updated) setViewingGleam(updated)
-    }
+    // Refresh viewingGleam's intelligence from the new timeline data.
+    // Use the functional updater so we always re-find by the *current*
+    // id rather than a stale closure value. A stale `viewingGleam`
+    // here would clobber the just-opened gleam: e.g. clicking an
+    // older card while the latest is open would snap the detail back to
+    // the previously-viewed (latest) gleam.
+    setViewingGleam((prev) => {
+      if (!prev) return prev
+      const updated = items.find((i) => i.gleam.id === prev.gleam.id)
+      return updated ?? prev
+    })
   }
 
   useEffect(() => {
