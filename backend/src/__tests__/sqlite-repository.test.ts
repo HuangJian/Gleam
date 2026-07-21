@@ -581,3 +581,66 @@ describe('SqliteRepository.savePromptSnapshot', () => {
     expect(rows).toHaveLength(2)
   })
 })
+
+// ── Backoff indexing (Bug 3 regression) ──────────────────
+
+describe('SqliteRepository.findPendingArtifacts — backoff indexing', () => {
+  test('bugfix: first retry uses 1-min backoff (BACKOFF_SCHEDULE[0]), not 5-min', async () => {
+    const gleam = makeGleam()
+    await repo.appendGleams([gleam])
+    await repo.createGleamAI(gleam.id)
+
+    // Simulate a failed summary attempt (retryCount becomes 1).
+    await repo.recordArtifactFailure(gleam.id, 'summary')
+
+    // Set last_attempt_at to 90 seconds ago — past the 1-min backoff
+    // but well within the old (buggy) 5-min backoff.
+    const ninetySecondsAgo = new Date(Date.now() - 90_000).toISOString()
+    sqlite
+      .prepare('UPDATE gleam_ai SET summary_last_attempt_at = ? WHERE gleam_id = ?')
+      .run(ninetySecondsAgo, gleam.id)
+
+    const pending = await repo.findPendingArtifacts(100)
+    const summaryPending = pending.filter((p) => p.gleamId === gleam.id && p.artifact === 'summary')
+    // With the fix, 1-min backoff has elapsed → artifact is retryable.
+    // Before the fix, 5-min backoff would NOT have elapsed → not retried.
+    expect(summaryPending).toHaveLength(1)
+  })
+
+  test('bugfix: artifact not retried when 1-min backoff has not elapsed', async () => {
+    const gleam = makeGleam()
+    await repo.appendGleams([gleam])
+    await repo.createGleamAI(gleam.id)
+
+    await repo.recordArtifactFailure(gleam.id, 'summary')
+
+    // Set last_attempt_at to 10 seconds ago — within the 1-min backoff.
+    const tenSecondsAgo = new Date(Date.now() - 10_000).toISOString()
+    sqlite
+      .prepare('UPDATE gleam_ai SET summary_last_attempt_at = ? WHERE gleam_id = ?')
+      .run(tenSecondsAgo, gleam.id)
+
+    const pending = await repo.findPendingArtifacts(100)
+    const summaryPending = pending.filter((p) => p.gleamId === gleam.id && p.artifact === 'summary')
+    expect(summaryPending).toHaveLength(0)
+  })
+
+  test('bugfix: permanent failure (retryCount=max) is never retried', async () => {
+    const gleam = makeGleam()
+    await repo.appendGleams([gleam])
+    await repo.createGleamAI(gleam.id)
+
+    // Record a permanent failure — retryCount set to BACKOFF_SCHEDULE.length.
+    await repo.recordArtifactFailure(gleam.id, 'summary', true)
+
+    // Even with an old last_attempt_at, the scheduler should not retry.
+    const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString()
+    sqlite
+      .prepare('UPDATE gleam_ai SET summary_last_attempt_at = ? WHERE gleam_id = ?')
+      .run(oneHourAgo, gleam.id)
+
+    const pending = await repo.findPendingArtifacts(100)
+    const summaryPending = pending.filter((p) => p.gleamId === gleam.id && p.artifact === 'summary')
+    expect(summaryPending).toHaveLength(0)
+  })
+})

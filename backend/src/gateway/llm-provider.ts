@@ -87,8 +87,15 @@ export class LLMError extends Error {
 // ── Provider interface ─────────────────────────────────
 
 export interface LLMProvider {
-  /** Provider name (e.g. 'openai'). Stored for provenance. */
+  /** Provider name (e.g. 'openai'). */
   readonly name: string
+
+  /**
+   * API endpoint used for requests. Stored in `gleam_ai.provider` for
+   * provenance — identifies the actual provider instance, unlike `name`
+   * which is a generic category (e.g. 'openai-compatible').
+   */
+  readonly endpoint: string
 
   /** Model used for chat-based capabilities (summary, tags). */
   readonly model: string

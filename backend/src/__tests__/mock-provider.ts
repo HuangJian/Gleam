@@ -6,6 +6,7 @@ import type {
   TagsResult,
   ValidationResult,
 } from '../gateway/llm-provider'
+import { LLMError } from '../gateway/llm-provider'
 
 /**
  * Deterministic mock LLMProvider for unit and integration tests.
@@ -45,6 +46,7 @@ const TOPICS = [
 
 export class MockProvider implements LLMProvider {
   readonly name = 'mock'
+  readonly endpoint = 'https://mock.example.com'
   readonly model = 'mock-chat-model'
   readonly embeddingModel = 'mock-embedding-model'
 
@@ -53,12 +55,28 @@ export class MockProvider implements LLMProvider {
   failTags = false
   failEmbedding = false
 
+  // ── LLMError failure injection (for retry testing) ───
+  /** When > 0, summarize() throws a retryable LLMError (429) and decrements. */
+  summaryRetryableFailures = 0
+  /** When true, summarize() throws a non-retryable LLMError (401). */
+  summaryPermanentFail = false
+  /** Tracks summarize() call count for retry assertions. */
+  summarizeCallCount = 0
+
   async validateConfig(): Promise<ValidationResult> {
     // Always valid — no external dependencies.
     return { reasoningSuppression: false }
   }
 
   async summarize(input: LLMInput, _prompt: string): Promise<SummarizeResult> {
+    this.summarizeCallCount++
+    if (this.summaryPermanentFail) {
+      throw new LLMError('Mock permanent failure (401)', false, 401)
+    }
+    if (this.summaryRetryableFailures > 0) {
+      this.summaryRetryableFailures--
+      throw new LLMError('Mock retryable failure (429)', true, 429)
+    }
     if (this.failSummary) {
       throw new Error('Mock summary failure (injected)')
     }

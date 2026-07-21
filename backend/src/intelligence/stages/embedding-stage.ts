@@ -1,7 +1,9 @@
 import type { IIntelligenceRepository } from '../../repository/repository'
 import type { LLMInput } from '../../gateway/llm-provider'
+import { LLMError } from '../../gateway/llm-provider'
 import type { ObservationContext } from '../observation-context'
 import type { ObservationStage, StageOutcome } from './stage'
+import { withLLMRetry } from './stage'
 
 /**
  * Embedding Stage — produces a vector representation of a Gleam.
@@ -32,17 +34,18 @@ export class EmbeddingStage implements ObservationStage {
         thought: ctx.gleam.thought,
         source: ctx.gleam.source,
       }
-      const result = await ctx.provider.generateEmbedding(input)
+      const result = await withLLMRetry(() => ctx.provider.generateEmbedding(input))
       await this.repo.updateEmbedding(
         ctx.gleam.id,
         result.embedding,
         result.dimensions,
-        ctx.provider.name,
+        ctx.provider.endpoint,
         ctx.provider.embeddingModel,
       )
       return 'success'
-    } catch {
-      await this.repo.recordArtifactFailure(ctx.gleam.id, 'embedding')
+    } catch (e) {
+      const permanent = e instanceof LLMError && !e.retryable
+      await this.repo.recordArtifactFailure(ctx.gleam.id, 'embedding', permanent)
       return 'failed'
     }
   }

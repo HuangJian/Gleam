@@ -145,8 +145,14 @@ export interface IIntelligenceRepository {
     status: ObservationStatus,
   ): Promise<void>
 
-  /** Record a failed attempt and increment the retry counter. */
-  recordArtifactFailure(gleamId: string, artifact: ArtifactType): Promise<void>
+  /**
+   * Record a failed attempt and increment the retry counter.
+   *
+   * When `permanent` is true, the retry counter is set to the maximum,
+   * preventing the Scheduler from scheduling future retries. Used for
+   * non-retryable errors (e.g. 401 invalid API key, 404 unknown model).
+   */
+  recordArtifactFailure(gleamId: string, artifact: ArtifactType, permanent?: boolean): Promise<void>
 
   getGleamAI(gleamId: string): Promise<GleamAI | null>
 

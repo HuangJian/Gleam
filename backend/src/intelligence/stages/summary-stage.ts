@@ -1,7 +1,9 @@
 import type { IIntelligenceRepository } from '../../repository/repository'
 import type { LLMInput } from '../../gateway/llm-provider'
+import { LLMError } from '../../gateway/llm-provider'
 import type { ObservationContext } from '../observation-context'
 import type { ObservationStage, StageOutcome } from './stage'
+import { withLLMRetry } from './stage'
 
 /**
  * Summary Stage — produces a one-sentence summary of a Gleam.
@@ -28,17 +30,18 @@ export class SummaryStage implements ObservationStage {
         thought: ctx.gleam.thought,
         source: ctx.gleam.source,
       }
-      const result = await ctx.provider.summarize(input, prompt.content)
+      const result = await withLLMRetry(() => ctx.provider.summarize(input, prompt.content))
       await this.repo.updateSummary(
         ctx.gleam.id,
         result.summary,
-        ctx.provider.name,
+        ctx.provider.endpoint,
         ctx.provider.model,
         prompt.version,
       )
       return 'success'
-    } catch {
-      await this.repo.recordArtifactFailure(ctx.gleam.id, 'summary')
+    } catch (e) {
+      const permanent = e instanceof LLMError && !e.retryable
+      await this.repo.recordArtifactFailure(ctx.gleam.id, 'summary', permanent)
       return 'failed'
     }
   }

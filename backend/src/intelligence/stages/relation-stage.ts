@@ -54,7 +54,7 @@ export class RelationStage implements ObservationStage {
       const prompt = ctx.promptRegistry.resolve('relation')
       await this.repo.updateRelationObservation(
         ctx.gleam.id,
-        ctx.provider.name,
+        ctx.provider.endpoint,
         ctx.provider.model,
         prompt.version,
       )

@@ -54,6 +54,7 @@ interface ChatCompletionResponse {
 
 export class OpenAICompatibleProvider implements LLMProvider {
   readonly name = 'openai-compatible'
+  readonly endpoint: string
   readonly model: string
   readonly embeddingModel: string
 
@@ -71,6 +72,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     if (!base) {
       throw new Error('OpenAI-compatible provider requires a non-empty endpoint')
     }
+    this.endpoint = base
     this.chatUrl = `${base}/v1/chat/completions`
     this.embeddingsUrl = `${base}/v1/embeddings`
   }

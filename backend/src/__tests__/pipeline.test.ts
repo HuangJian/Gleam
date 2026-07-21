@@ -102,7 +102,7 @@ describe('ObservationPipeline.observe — full observation', () => {
     await pipeline.observe(gleam, provider)
 
     const ai = await repo.getGleamAI(gleam.id)
-    expect(ai!.provider).toBe('mock')
+    expect(ai!.provider).toBe('https://mock.example.com')
     expect(ai!.model).toBe('mock-chat-model')
 
     // Prompt versions from the registry
@@ -291,5 +291,61 @@ describe('ObservationPipeline.observe — relations', () => {
     const relations = await repo.getRelations(g1.id)
     expect(relations.length).toBe(1)
     expect(relations[0].targetGleamId).toBe(g2.id)
+  })
+
+  test('bugfix: replaceAIRelations filters out self-relations', async () => {
+    const g1 = makeGleam({
+      id: '01978a3e-0001-7c3d-8e4f-5a6b7c8d9e0f',
+      thought: 'React hooks changed how I think about state.',
+    })
+    await repo.appendGleams([g1])
+    await repo.createGleamAI(g1.id)
+
+    // Directly call replaceAIRelations with a self-relation mixed in.
+    await repo.replaceAIRelations(g1.id, [
+      { targetGleamId: g1.id, strength: 1.0 }, // self — must be filtered
+      { targetGleamId: '01978a3e-0002-7c3d-8e4f-5a6b7c8d9e0f', strength: 0.9 },
+    ])
+
+    const relations = await repo.getRelations(g1.id)
+    // Only the non-self relation should be stored.
+    expect(relations.length).toBe(1)
+    expect(relations[0].targetGleamId).not.toBe(g1.id)
+  })
+})
+
+// ── LLM retry behavior ─────────────────────────────────
+
+describe('ObservationPipeline.observe — LLM retry', () => {
+  test('bugfix: retryable LLMError triggers immediate retry and succeeds', async () => {
+    const gleam = makeGleam()
+    await repo.appendGleams([gleam])
+    await repo.createGleamAI(gleam.id)
+
+    // First call throws a retryable LLMError (429), second succeeds.
+    provider.summaryRetryableFailures = 1
+    await pipeline.observe(gleam, provider)
+
+    const ai = await repo.getGleamAI(gleam.id)
+    expect(ai!.summaryStatus).toBe('completed')
+    expect(ai!.summary).toBe('Summary: React hooks are powerful.')
+    // summarize() was called twice: first failed (429), second succeeded.
+    expect(provider.summarizeCallCount).toBe(2)
+  })
+
+  test('bugfix: non-retryable LLMError fails immediately (no immediate retry, permanent failure)', async () => {
+    const gleam = makeGleam()
+    await repo.appendGleams([gleam])
+    await repo.createGleamAI(gleam.id)
+
+    provider.summaryPermanentFail = true
+    await pipeline.observe(gleam, provider)
+
+    const ai = await repo.getGleamAI(gleam.id)
+    expect(ai!.summaryStatus).toBe('failed')
+    // retryCount set to max (BACKOFF_SCHEDULE.length) — scheduler won't retry.
+    expect(ai!.summaryRetryCount).toBeGreaterThanOrEqual(4)
+    // summarize() called only once — no immediate retry for non-retryable.
+    expect(provider.summarizeCallCount).toBe(1)
   })
 })

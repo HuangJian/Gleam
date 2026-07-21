@@ -456,8 +456,11 @@ export class SqliteRepository implements IRepository, IIntelligenceRepository {
           // Retry only after backoff elapsed (or if never attempted).
           const lastAttempt = row[LAST_ATTEMPT_FIELD[artifact]] as string | null
           const retryCount = row[RETRY_FIELD[artifact]] as number
-          if (retryCount >= BACKOFF_SCHEDULE.length) continue
-          const backoffMs = BACKOFF_SCHEDULE[retryCount]
+          // retryCount is incremented by recordArtifactFailure on each
+          // failure. Index into BACKOFF_SCHEDULE with retryCount - 1 so
+          // the first retry (retryCount=1) uses BACKOFF_SCHEDULE[0].
+          if (retryCount === 0 || retryCount >= BACKOFF_SCHEDULE.length) continue
+          const backoffMs = BACKOFF_SCHEDULE[retryCount - 1]
           const lastMs = lastAttempt ? Date.parse(lastAttempt) : 0
           if (now - lastMs >= backoffMs) {
             out.push({ gleamId: row.gleamId, artifact })
@@ -629,16 +632,24 @@ export class SqliteRepository implements IRepository, IIntelligenceRepository {
     this.db.update(gleamAi).set(updates).where(eq(gleamAi.gleamId, gleamId)).run()
   }
 
-  async recordArtifactFailure(gleamId: string, artifact: ArtifactType): Promise<void> {
+  async recordArtifactFailure(
+    gleamId: string,
+    artifact: ArtifactType,
+    permanent = false,
+  ): Promise<void> {
     const now = new Date().toISOString()
     const row = this.db.select().from(gleamAi).where(eq(gleamAi.gleamId, gleamId)).get()
     const currentRetry = (row?.[RETRY_FIELD[artifact]] as number) ?? 0
+
+    // For permanent failures, set retry count to max so the Scheduler
+    // never schedules a retry. Otherwise, increment normally.
+    const nextRetry = permanent ? BACKOFF_SCHEDULE.length : currentRetry + 1
 
     this.db
       .update(gleamAi)
       .set({
         [STATUS_FIELD[artifact]]: 'failed',
-        [RETRY_FIELD[artifact]]: currentRetry + 1,
+        [RETRY_FIELD[artifact]]: nextRetry,
         [LAST_ATTEMPT_FIELD[artifact]]: now,
         updatedAt: now,
       })
@@ -736,7 +747,11 @@ export class SqliteRepository implements IRepository, IIntelligenceRepository {
         .run()
 
       // Insert new AI relations.
+      // Defensive guard: never store a self-relation (source = target).
+      // findSimilarGleams already excludes self, but this prevents any
+      // future regression from corrupting the relation graph.
       for (const r of relations) {
+        if (r.targetGleamId === sourceGleamId) continue
         this.db
           .insert(gleamRelations)
           .values({
