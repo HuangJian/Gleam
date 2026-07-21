@@ -1,8 +1,9 @@
 import type { LLMProvider } from './llm-provider'
-import { OpenAICompatibleProvider } from './openai-compatible-provider'
+import { OpenAICompatibleProvider, isReasoningModel } from './openai-compatible-provider'
 import { decrypt } from '../config/encryption'
 import type { IntelligenceConfig } from '../domain/gleam-ai'
 import { LLMError } from './llm-provider'
+import { logger } from '../util/logger'
 
 /**
  * Constructs an `LLMProvider` instance from a stored IntelligenceConfig.
@@ -21,14 +22,27 @@ export function createProvider(config: IntelligenceConfig): LLMProvider {
 
   switch (config.provider) {
     case 'openai':
-    case 'openai-compatible':
+    case 'openai-compatible': {
+      // Auto-correct: configs saved before the reasoning_suppression
+      // migration (0005) have the default value false. Known reasoning
+      // models must have suppression enabled — correct here rather than
+      // requiring the user to re-configure the provider.
+      let reasoningSuppression = config.reasoningSuppression
+      if (!reasoningSuppression && isReasoningModel(config.model)) {
+        logger.warn(
+          'Reasoning suppression auto-corrected: model is a known reasoning model but persisted flag is false',
+          { model: config.model },
+        )
+        reasoningSuppression = true
+      }
       return new OpenAICompatibleProvider({
         apiKey,
         model: config.model,
         embeddingModel: config.embeddingModel,
         endpoint: config.endpoint,
-        reasoningSuppression: config.reasoningSuppression,
+        reasoningSuppression,
       })
+    }
     default:
       throw new LLMError(`Unknown provider: ${config.provider}`, false)
   }

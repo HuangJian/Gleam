@@ -13,6 +13,12 @@ export interface AppConfig {
   /**
    * Cosine similarity threshold for AI-generated semantic_proximity
    * relations. Pairs below this threshold are not stored.
+   *
+   * Default 0.5 — calibrated for instruction-tuned embedding models
+   * (e.g. NVIDIA Nemotron-3-Embed-1B with input_type=passage) where
+   * similar texts typically score 0.5–0.7 and dissimilar texts
+   * 0.2–0.5. The previous default of 0.75 was suited to OpenAI-style
+   * embeddings but produced zero relations with passage-type embeddings.
    */
   relationThreshold: number
   /** Maximum number of relations stored per Gleam. */
@@ -32,7 +38,7 @@ export function loadConfig(): AppConfig {
     logLevel: process.env.LOG_LEVEL ?? 'info',
     promptsDir: process.env.PROMPTS_DIR ?? './prompts',
     schedulerIntervalMs: Number(process.env.SCHEDULER_INTERVAL_MS ?? 30_000),
-    relationThreshold: Number(process.env.RELATION_THRESHOLD ?? 0.75),
+    relationThreshold: Number(process.env.RELATION_THRESHOLD ?? 0.5),
     relationLimit: Number(process.env.RELATION_LIMIT ?? 20),
     schedulerBatchSize: Number(process.env.SCHEDULER_BATCH_SIZE ?? 10),
   }

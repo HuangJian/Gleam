@@ -154,6 +154,15 @@ export class OpenAICompatibleProvider implements LLMProvider {
         body: JSON.stringify({
           model: this.embeddingModel,
           input: text,
+          // input_type=passage is required for instruction-tuned embedding
+          // models (e.g. NVIDIA Nemotron-3-Embed-1B). Without it, the model
+          // skips the instruction prefix and all embeddings collapse into a
+          // narrow cone — cosine similarity exceeds 0.8 even for unrelated
+          // content. Providers that don't recognise this field (e.g. OpenAI)
+          // silently ignore it. encoding_format=float is explicit but also
+          // the API default for most providers.
+          input_type: 'passage',
+          encoding_format: 'float',
         }),
       })
     } catch (e) {
@@ -196,9 +205,10 @@ export class OpenAICompatibleProvider implements LLMProvider {
    * `reasoning: { enabled: false }` parameter.
    *
    * Sends a minimal chat request ("Say OK.", max_tokens 5) with the param.
-   * If the API returns 200, the param is supported. If it returns 400/422,
-   * the param is not supported. On network error, falls back to
-   * `isReasoningModel()` pattern matching on the model name.
+   * If the API returns 200, the param is supported. If it returns 400/422
+   * (param rejected) or a network error occurs, falls back to
+   * `isReasoningModel()` pattern matching on the model name — known
+   * reasoning models are always detected even if the probe fails.
    *
    * Called once during `validateConfig()`. The result is persisted in the
    * database and passed to future provider constructors — this method is
@@ -228,11 +238,15 @@ export class OpenAICompatibleProvider implements LLMProvider {
         return true
       }
 
-      logger.info('Reasoning probe: suppression param rejected', {
+      // API rejected the param — fall back to pattern matching so known
+      // reasoning models are still detected even when the probe fails.
+      const fallback = isReasoningModel(this.model)
+      logger.info('Reasoning probe: suppression param rejected, using pattern fallback', {
         model: this.model,
         status: res.status,
+        suppressed: fallback,
       })
-      return false
+      return fallback
     } catch {
       // Network error — fall back to pattern matching on the model name.
       const fallback = isReasoningModel(this.model)

@@ -204,6 +204,66 @@ describe('OpenAICompatibleProvider chatCompletion', () => {
   })
 })
 
+// ── Tests: generateEmbedding sends input_type=passage ──
+
+describe('OpenAICompatibleProvider.generateEmbedding', () => {
+  const originalFetch = globalThis.fetch
+
+  beforeEach(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  test('sends input_type=passage and encoding_format=float in request body', async () => {
+    let captured: Record<string, unknown> | undefined
+    globalThis.fetch = mock(async (_url: string, init?: RequestInit) => {
+      captured = init?.body
+        ? (JSON.parse(init.body as string) as Record<string, unknown>)
+        : undefined
+      return new Response(
+        JSON.stringify({
+          data: [{ embedding: [0.1, 0.2, 0.3] }],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }) as unknown as typeof fetch
+
+    const provider = makeProvider('nvidia/nemotron-3-ultra-550b-a55b')
+    await provider.generateEmbedding(INPUT)
+
+    expect(captured).toBeDefined()
+    expect(captured!.input_type).toBe('passage')
+    expect(captured!.encoding_format).toBe('float')
+    expect(captured!.model).toBe('test-embedding')
+  })
+
+  test('returns Float32 Buffer with correct dimensions', async () => {
+    const fakeVec = [1.0, 2.0, 3.0, 4.0]
+    globalThis.fetch = mock(async () => {
+      return new Response(JSON.stringify({ data: [{ embedding: fakeVec }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }) as unknown as typeof fetch
+
+    const provider = makeProvider('nvidia/nemotron-3-ultra-550b-a55b')
+    const result = await provider.generateEmbedding(INPUT)
+
+    expect(result.dimensions).toBe(4)
+    const float32 = new Float32Array(
+      result.embedding.buffer,
+      result.embedding.byteOffset,
+      result.embedding.byteLength / 4,
+    )
+    expect(float32.length).toBe(4)
+    expect(float32[0]).toBeCloseTo(1.0, 5)
+    expect(float32[3]).toBeCloseTo(4.0, 5)
+  })
+})
+
 // ── Tests: validateConfig probes and returns result ─────
 
 describe('OpenAICompatibleProvider.validateConfig', () => {
@@ -227,7 +287,7 @@ describe('OpenAICompatibleProvider.validateConfig', () => {
     expect(result.reasoningSuppression).toBe(true)
   })
 
-  test('probes and returns reasoningSuppression=false when API rejects', async () => {
+  test('probes and returns reasoningSuppression=false when API rejects (non-reasoning model)', async () => {
     const { probeWasSent } = mockFetchForValidate('OK', 'reject')
     const provider = makeProvider('gpt-4o-mini')
 
@@ -235,6 +295,17 @@ describe('OpenAICompatibleProvider.validateConfig', () => {
 
     expect(probeWasSent()).toBe(true)
     expect(result.reasoningSuppression).toBe(false)
+  })
+
+  test('bugfix: falls back to isReasoningModel() on probe rejection (reasoning model)', async () => {
+    const { probeWasSent } = mockFetchForValidate('OK', 'reject')
+    const provider = makeProvider('nvidia/nemotron-3-ultra-550b-a55b')
+
+    const result = await provider.validateConfig()
+
+    expect(probeWasSent()).toBe(true)
+    // nemotron matches the pattern → true, even though the API rejected the param
+    expect(result.reasoningSuppression).toBe(true)
   })
 
   test('falls back to pattern matching on probe network error (reasoning model)', async () => {

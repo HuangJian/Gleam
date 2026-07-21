@@ -87,6 +87,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
     body: JSON.stringify({
       model: MODEL,
       input: text,
+      input_type: 'passage',
       encoding_format: 'float',
     }),
   })
