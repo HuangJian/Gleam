@@ -291,7 +291,12 @@ describe('ServerClient', () => {
       data: { configureProvider: { provider: 'openai', model: 'gpt-4o-mini', success: true } },
     })
 
-    const result = await client.configureProvider('openai', 'gpt-4o-mini', 'sk-xxx')
+    const result = await client.configureProvider(
+      'openai',
+      'gpt-4o-mini',
+      'text-embedding-3-small',
+      'sk-xxx',
+    )
     expect(result.provider).toBe('openai')
     expect(result.model).toBe('gpt-4o-mini')
     expect(result.success).toBe(true)
@@ -300,6 +305,7 @@ describe('ServerClient', () => {
     expect(body.query).toContain('configureProvider')
     expect(body.variables.provider).toBe('openai')
     expect(body.variables.model).toBe('gpt-4o-mini')
+    expect(body.variables.embeddingModel).toBe('text-embedding-3-small')
     expect(body.variables.apiKey).toBe('sk-xxx')
   })
 

@@ -806,6 +806,7 @@ export class SqliteRepository implements IRepository, IIntelligenceRepository {
     return {
       provider: row.provider,
       model: row.model,
+      embeddingModel: row.embeddingModel,
       encryptedApiKey: row.encryptedApiKey,
       apiKeyIv: row.apiKeyIv,
       updatedAt: row.updatedAt,
@@ -822,6 +823,7 @@ export class SqliteRepository implements IRepository, IIntelligenceRepository {
         .values({
           provider: config.provider,
           model: config.model,
+          embeddingModel: config.embeddingModel,
           encryptedApiKey: config.encryptedApiKey,
           apiKeyIv: config.apiKeyIv,
           updatedAt: now,
@@ -835,12 +837,29 @@ export class SqliteRepository implements IRepository, IIntelligenceRepository {
     this.db.delete(intelligenceConfig).run()
   }
 
+  async resetAllEmbeddings(): Promise<void> {
+    const now = new Date().toISOString()
+    // Flip embedding + relation status to pending for every Gleam. The
+    // Scheduler discovers pending artifacts in batches and regenerates them.
+    // Relation depends on embedding, so both reset together; user-created
+    // relations survive the Relation stage's wholesale AI-relation replace.
+    this.db
+      .update(gleamAi)
+      .set({
+        embeddingStatus: 'pending',
+        relationStatus: 'pending',
+        updatedAt: now,
+      })
+      .run()
+  }
+
   async getIntelligenceConfigView(): Promise<IntelligenceConfigView | null> {
     const row = this.db.select().from(intelligenceConfig).limit(1).get()
     if (!row) return null
     return {
       provider: row.provider,
       model: row.model,
+      embeddingModel: row.embeddingModel,
       hasApiKey: row.encryptedApiKey.length > 0,
     }
   }

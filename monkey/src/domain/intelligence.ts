@@ -47,6 +47,8 @@ export interface GleamRelation {
 export interface IntelligenceConfigView {
   provider: string
   model: string
+  /** Resolved embedding model (provider default applied if unset). */
+  embeddingModel: string
   hasApiKey: boolean
 }
 

@@ -282,8 +282,8 @@ export function App({ repository, syncService, shadowHost }: AppProps) {
           await refreshTimeline()
         }}
         onGetIntelligenceConfig={() => syncService.getIntelligenceConfig()}
-        onConfigureProvider={(provider, model, apiKey) =>
-          syncService.configureProvider(provider, model, apiKey)
+        onConfigureProvider={(provider, model, embeddingModel, apiKey) =>
+          syncService.configureProvider(provider, model, embeddingModel, apiKey)
         }
         onRemoveProvider={() => syncService.removeProvider()}
       />

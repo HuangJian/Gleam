@@ -145,6 +145,8 @@ export interface GleamRelation {
 export interface IntelligenceConfig {
   provider: string
   model: string
+  /** Embedding model. Always user-supplied — no server default. */
+  embeddingModel: string
   encryptedApiKey: string // base64 ciphertext
   apiKeyIv: string // base64 IV
   updatedAt: string
@@ -158,6 +160,8 @@ export interface IntelligenceConfig {
 export interface IntelligenceConfigView {
   provider: string
   model: string
+  /** Embedding model (always user-supplied). */
+  embeddingModel: string
   hasApiKey: boolean
 }
 

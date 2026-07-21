@@ -114,6 +114,8 @@ export const intelligenceConfig = sqliteTable('intelligence_config', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   provider: text('provider').notNull(),
   model: text('model').notNull(),
+  // Embedding model — separate from `model` (chat). Always user-supplied.
+  embeddingModel: text('embedding_model').notNull(),
   encryptedApiKey: text('encrypted_api_key').notNull(),
   apiKeyIv: text('api_key_iv').notNull(),
   updatedAt: text('updated_at').notNull(),

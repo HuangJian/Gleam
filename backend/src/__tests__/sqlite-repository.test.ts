@@ -478,3 +478,78 @@ describe('SqliteRepository.getGleamById', () => {
     expect(fetched).toBeNull()
   })
 })
+
+// ── Intelligence config ────────────────────────────────
+
+describe('SqliteRepository intelligence config', () => {
+  function makeConfig(
+    overrides: Partial<{
+      provider: string
+      model: string
+      embeddingModel: string
+      encryptedApiKey: string
+      apiKeyIv: string
+    }> = {},
+  ) {
+    return {
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      embeddingModel: 'text-embedding-3-small',
+      encryptedApiKey: 'enc',
+      apiKeyIv: 'iv',
+      updatedAt: new Date().toISOString(),
+      ...overrides,
+    }
+  }
+
+  test('getIntelligenceConfigView returns stored embeddingModel', async () => {
+    await repo.saveIntelligenceConfig(makeConfig({ embeddingModel: 'text-embedding-3-large' }))
+    const view = await repo.getIntelligenceConfigView()
+    expect(view!.embeddingModel).toBe('text-embedding-3-large')
+  })
+
+  test('resetAllEmbeddings flips embedding + relation status to pending for all gleams', async () => {
+    const g1 = makeGleam({ id: '01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f' })
+    const g2 = makeGleam({ id: '01978a3e-2b3c-7c3d-8e4f-5a6b7c8d9e0f' })
+    await repo.appendGleams([g1, g2])
+    await repo.createGleamAI(g1.id)
+    await repo.createGleamAI(g2.id)
+
+    // Mark both as completed via the repository's status setter.
+    await repo.setArtifactStatus('01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f', 'embedding', 'completed')
+    await repo.setArtifactStatus('01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f', 'relation', 'completed')
+    await repo.setArtifactStatus('01978a3e-2b3c-7c3d-8e4f-5a6b7c8d9e0f', 'embedding', 'completed')
+    await repo.setArtifactStatus('01978a3e-2b3c-7c3d-8e4f-5a6b7c8d9e0f', 'relation', 'completed')
+
+    await repo.resetAllEmbeddings()
+
+    const pending = await repo.findPendingArtifacts(100)
+    const embeddingIds = pending
+      .filter((p) => p.artifact === 'embedding')
+      .map((p) => p.gleamId)
+      .sort()
+    const relationIds = pending
+      .filter((p) => p.artifact === 'relation')
+      .map((p) => p.gleamId)
+      .sort()
+    expect(embeddingIds).toEqual([
+      '01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f',
+      '01978a3e-2b3c-7c3d-8e4f-5a6b7c8d9e0f',
+    ])
+    expect(relationIds).toEqual([
+      '01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f',
+      '01978a3e-2b3c-7c3d-8e4f-5a6b7c8d9e0f',
+    ])
+  })
+
+  test('resetAllEmbeddings is idempotent', async () => {
+    const g1 = makeGleam({ id: '01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f' })
+    await repo.appendGleams([g1])
+    await repo.createGleamAI(g1.id)
+    await repo.resetAllEmbeddings()
+    await repo.resetAllEmbeddings()
+    const pending = await repo.findPendingArtifacts(100)
+    const embeddingIds = pending.filter((p) => p.artifact === 'embedding').map((p) => p.gleamId)
+    expect(embeddingIds).toEqual(['01978a3e-1a2b-7c3d-8e4f-5a6b7c8d9e0f'])
+  })
+})

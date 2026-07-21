@@ -1,6 +1,6 @@
 node_modules/
 data/
-drizzle/
+drizzle/meta/*_snapshot.json
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm

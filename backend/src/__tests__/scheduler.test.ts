@@ -272,6 +272,7 @@ async function saveProviderConfig(repository: SqliteRepository): Promise<void> {
   await repository.saveIntelligenceConfig({
     provider: 'openai',
     model: 'gpt-4o-mini',
+    embeddingModel: 'text-embedding-3-small',
     encryptedApiKey: encrypted.ciphertext,
     apiKeyIv: encrypted.iv,
     updatedAt: new Date().toISOString(),

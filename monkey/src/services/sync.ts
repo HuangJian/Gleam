@@ -271,8 +271,13 @@ export class SyncService {
   }
 
   /** Configures provider. Throws on validation failure. */
-  async configureProvider(provider: string, model: string, apiKey: string): Promise<void> {
-    await this.serverClient.configureProvider(provider, model, apiKey)
+  async configureProvider(
+    provider: string,
+    model: string,
+    embeddingModel: string,
+    apiKey: string,
+  ): Promise<void> {
+    await this.serverClient.configureProvider(provider, model, embeddingModel, apiKey)
   }
 
   /** Removes provider configuration. */

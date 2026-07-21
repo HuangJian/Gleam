@@ -207,6 +207,14 @@ export interface IIntelligenceRepository {
   removeIntelligenceConfig(): Promise<void>
   getIntelligenceConfigView(): Promise<IntelligenceConfigView | null>
 
+  /**
+   * Reset embedding (and, by dependency, relation) status to `pending` for
+   * every Gleam. Used when the embedding model changes so the Scheduler
+   * regenerates all embeddings against the new vector space. User-created
+   * relations are untouched by the Relation stage.
+   */
+  resetAllEmbeddings(): Promise<void>
+
   // ── Prompt history ─────────────────────────────────
 
   savePromptSnapshot(

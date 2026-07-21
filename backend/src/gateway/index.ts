@@ -5,14 +5,6 @@ import type { IntelligenceConfig } from '../domain/gleam-ai'
 import { LLMError } from './llm-provider'
 
 /**
- * Default embedding model per provider. Kept here (not in config) so that
- * adding a new provider only requires touching this factory.
- */
-const DEFAULT_EMBEDDING_MODEL: Record<string, string> = {
-  openai: 'text-embedding-3-small',
-}
-
-/**
  * Constructs an `LLMProvider` instance from a stored IntelligenceConfig.
  *
  * The Gateway is the only place where the API key is decrypted. The
@@ -32,7 +24,7 @@ export function createProvider(config: IntelligenceConfig): LLMProvider {
       return new OpenAIProvider({
         apiKey,
         model: config.model,
-        embeddingModel: DEFAULT_EMBEDDING_MODEL.openai,
+        embeddingModel: config.embeddingModel,
       })
     default:
       throw new LLMError(`Unknown provider: ${config.provider}`, false)
@@ -44,20 +36,22 @@ export function createProvider(config: IntelligenceConfig): LLMProvider {
  * before persisting the configuration. Validates that the credentials
  * are usable.
  *
- * `provider` and `model` come from the GraphQL input; `apiKey` is the
- * plaintext key entered by the user (not yet encrypted).
+ * `provider`, `model`, and `embeddingModel` come from the GraphQL input;
+ * `apiKey` is the plaintext key entered by the user (not yet encrypted).
+ * The embedding model is always user-supplied — there is no server default.
  */
 export function createProviderForValidation(
   provider: string,
   model: string,
   apiKey: string,
+  embeddingModel: string,
 ): LLMProvider {
   switch (provider) {
     case 'openai':
       return new OpenAIProvider({
         apiKey,
         model,
-        embeddingModel: DEFAULT_EMBEDDING_MODEL.openai,
+        embeddingModel,
       })
     default:
       throw new LLMError(`Unknown provider: ${provider}`, false)

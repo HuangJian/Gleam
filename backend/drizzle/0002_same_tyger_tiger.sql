@@ -1,0 +1,1 @@
+ALTER TABLE `intelligence_config` ADD `embedding_model` text;

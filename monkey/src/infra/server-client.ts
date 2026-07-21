@@ -207,8 +207,20 @@ const INTELLIGENCE_CONFIG_QUERY = /* GraphQL */ `
 `
 
 const CONFIGURE_PROVIDER_MUTATION = /* GraphQL */ `
-  mutation ConfigureProvider($provider: String!, $model: String!, $apiKey: String!) {
-    configureProvider(input: { provider: $provider, model: $model, apiKey: $apiKey }) {
+  mutation ConfigureProvider(
+    $provider: String!
+    $model: String!
+    $embeddingModel: String!
+    $apiKey: String!
+  ) {
+    configureProvider(
+      input: {
+        provider: $provider
+        model: $model
+        embeddingModel: $embeddingModel
+        apiKey: $apiKey
+      }
+    ) {
       provider
       model
       success
@@ -457,13 +469,14 @@ export class ServerClient {
   async getIntelligenceConfig(): Promise<IntelligenceConfigView | null> {
     const resp = await this.request(INTELLIGENCE_CONFIG_QUERY, {})
     const data = resp.data?.intelligenceConfig as
-      | { provider: string; model: string; hasApiKey: boolean }
+      | { provider: string; model: string; embeddingModel: string; hasApiKey: boolean }
       | null
       | undefined
     if (!data) return null
     return {
       provider: data.provider,
       model: data.model,
+      embeddingModel: data.embeddingModel,
       hasApiKey: data.hasApiKey,
     }
   }
@@ -475,11 +488,13 @@ export class ServerClient {
   async configureProvider(
     provider: string,
     model: string,
+    embeddingModel: string,
     apiKey: string,
   ): Promise<{ provider: string; model: string; success: boolean }> {
     const resp = await this.request(CONFIGURE_PROVIDER_MUTATION, {
       provider,
       model,
+      embeddingModel,
       apiKey,
     })
     const data = resp.data?.configureProvider as

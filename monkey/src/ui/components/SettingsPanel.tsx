@@ -13,7 +13,12 @@ interface SettingsPanelProps {
   onTestConnection: () => Promise<boolean>
   onSyncNow: () => Promise<void>
   onGetIntelligenceConfig: () => Promise<IntelligenceConfigView | null>
-  onConfigureProvider: (provider: string, model: string, apiKey: string) => Promise<void>
+  onConfigureProvider: (
+    provider: string,
+    model: string,
+    embeddingModel: string,
+    apiKey: string,
+  ) => Promise<void>
   onRemoveProvider: () => Promise<void>
 }
 
@@ -37,6 +42,7 @@ export function SettingsPanel({
   const [aiConfig, setAiConfig] = useState<IntelligenceConfigView | null>(null)
   const [provider, setProvider] = useState('openai')
   const [model, setModel] = useState('gpt-4o-mini')
+  const [embeddingModel, setEmbeddingModel] = useState('text-embedding-3-small')
   const [apiKey, setApiKey] = useState('')
   const [aiSaving, setAiSaving] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
@@ -51,6 +57,7 @@ export function SettingsPanel({
       if (config) {
         setProvider(config.provider)
         setModel(config.model)
+        setEmbeddingModel(config.embeddingModel)
       }
     })
   }, [isOpen])
@@ -78,7 +85,7 @@ export function SettingsPanel({
     setAiSaving(true)
     setAiError(null)
     try {
-      await onConfigureProvider(provider, model, apiKey)
+      await onConfigureProvider(provider, model, embeddingModel, apiKey)
       // Refresh config
       const config = await onGetIntelligenceConfig()
       setAiConfig(config)
@@ -208,12 +215,20 @@ export function SettingsPanel({
                   <ConfigValue>{aiConfig.model}</ConfigValue>
                 </ConfigRow>
                 <ConfigRow>
+                  <ConfigLabel>当前嵌入模型:</ConfigLabel>
+                  <ConfigValue>{aiConfig.embeddingModel}</ConfigValue>
+                </ConfigRow>
+                <ConfigRow>
                   <ConfigLabel>API Key:</ConfigLabel>
                   <ConfigValue>{aiConfig.hasApiKey ? '已配置 ✓' : '未配置'}</ConfigValue>
                 </ConfigRow>
               </ConfigInfo>
 
-              <PrivacyNotice>⚠ 修改模型或提供方需要重新输入 API Key。</PrivacyNotice>
+              <PrivacyNotice>
+                ⚠
+                修改嵌入模型会触发所有拾光的向量重新生成（关联也会重置）。修改模型或提供方需要重新输入
+                API Key。
+              </PrivacyNotice>
 
               <ProviderSelect
                 value={provider}
@@ -226,6 +241,12 @@ export function SettingsPanel({
                 placeholder="模型名称"
                 value={model}
                 onInput={(e: Event) => setModel((e.target as HTMLInputElement).value)}
+              />
+              <EmbeddingModelInput
+                type="text"
+                placeholder="嵌入模型名称"
+                value={embeddingModel}
+                onInput={(e: Event) => setEmbeddingModel((e.target as HTMLInputElement).value)}
               />
               <ApiKeyInput
                 type="password"
@@ -268,6 +289,12 @@ export function SettingsPanel({
                 placeholder="模型名称"
                 value={model}
                 onInput={(e: Event) => setModel((e.target as HTMLInputElement).value)}
+              />
+              <EmbeddingModelInput
+                type="text"
+                placeholder="嵌入模型名称"
+                value={embeddingModel}
+                onInput={(e: Event) => setEmbeddingModel((e.target as HTMLInputElement).value)}
               />
               <ApiKeyInput
                 type="password"
@@ -545,6 +572,24 @@ const ProviderSelect = styled.select`
 `
 
 const ModelInput = styled.input`
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: ${theme.typography.fontFamily};
+  color: ${theme.colors.text.primary};
+  background: ${theme.colors.bg.input};
+  outline: none;
+  box-sizing: border-box;
+  transition: ${theme.animations.transition};
+
+  &:focus {
+    border-color: ${theme.colors.border.focus};
+  }
+`
+
+const EmbeddingModelInput = styled.input`
   width: 100%;
   padding: 8px 12px;
   border: 1px solid ${theme.colors.border.light};

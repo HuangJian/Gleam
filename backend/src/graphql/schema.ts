@@ -213,6 +213,7 @@ const IntelligenceConfigType = builder
     fields: (t) => ({
       provider: t.exposeString('provider'),
       model: t.exposeString('model'),
+      embeddingModel: t.exposeString('embeddingModel'),
       hasApiKey: t.exposeBoolean('hasApiKey'),
     }),
   })
@@ -338,6 +339,7 @@ const ConfigureProviderInput = builder.inputType('ConfigureProviderInput', {
   fields: (t) => ({
     provider: t.string({ required: true }),
     model: t.string({ required: true }),
+    embeddingModel: t.string({ required: true }),
     apiKey: t.string({ required: true }),
   }),
 })
@@ -566,7 +568,7 @@ builder.mutationType({
         input: t.arg({ type: ConfigureProviderInput, required: true }),
       },
       resolve: async (_, args, ctx) => {
-        const { provider, model, apiKey } = args.input
+        const { provider, model, embeddingModel, apiKey } = args.input
 
         if (!hasEncryptionSecret()) {
           throw new Error(
@@ -577,13 +579,14 @@ builder.mutationType({
 
         // Validate before persisting — invalid credentials are rejected
         // immediately. Only usable provider configurations are stored.
-        const probe = createProviderForValidation(provider, model, apiKey)
+        const probe = createProviderForValidation(provider, model, apiKey, embeddingModel)
         try {
           await probe.validateConfig()
         } catch (e) {
           logger.warn('Provider validation failed', {
             provider,
             model,
+            embeddingModel,
             error: e instanceof Error ? e.message : String(e),
           })
           throw new Error(
@@ -592,16 +595,32 @@ builder.mutationType({
           )
         }
 
+        // Changing the embedding model invalidates every existing embedding
+        // (different vector space). Reset all embeddings — and relations, which
+        // depend on them — to pending so the Scheduler regenerates them. Only
+        // reset when a prior config existed; the first save has nothing to reset.
+        const existing = await ctx.intelligenceRepository.getIntelligenceConfig()
+        if (existing) {
+          if (existing.embeddingModel !== embeddingModel) {
+            await ctx.intelligenceRepository.resetAllEmbeddings()
+            logger.info('Embedding model changed — resetting all embeddings', {
+              from: existing.embeddingModel,
+              to: embeddingModel,
+            })
+          }
+        }
+
         const encrypted = encrypt(apiKey)
         await ctx.intelligenceRepository.saveIntelligenceConfig({
           provider,
           model,
+          embeddingModel,
           encryptedApiKey: encrypted.ciphertext,
           apiKeyIv: encrypted.iv,
           updatedAt: new Date().toISOString(),
         })
 
-        logger.info('Provider configured', { provider, model })
+        logger.info('Provider configured', { provider, model, embeddingModel })
         return { provider, model, success: true }
       },
     }),

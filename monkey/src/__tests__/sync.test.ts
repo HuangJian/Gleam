@@ -455,6 +455,7 @@ describe('SyncService', () => {
     const config: IntelligenceConfigView = {
       provider: 'openai',
       model: 'gpt-4o-mini',
+      embeddingModel: 'text-embedding-3-small',
       hasApiKey: true,
     }
     serverClient = createMockServerClient({
