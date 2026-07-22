@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'preact/hooks'
+import { useState, useEffect, useRef } from 'preact/hooks'
 import { SourceMedia } from '../domain/gleam'
 import type { GleamWithIntelligence } from '../domain/intelligence'
 import { IRepository } from '../domain/repository'
@@ -80,11 +80,20 @@ export function App({ repository, syncService, shadowHost }: AppProps) {
     refreshTimeline()
   }, [searchQuery])
 
-  // Periodic refresh: pick up new AI artifacts while ReviewRoom is open
+  // Periodic refresh: pick up new AI artifacts while ReviewRoom is open.
+  // `refreshTimeline` closes over `searchQuery`; the interval effect only
+  // re-subscribes when `isReviewOpen` flips, so it would otherwise capture a
+  // stale `refreshTimeline` and silently revert the list back to the default
+  // range (近三天) ~30s after the user picks a different one. A ref keeps the
+  // interval pointed at the latest `refreshTimeline` (and thus the current
+  // query) on every tick.
+  const refreshTimelineRef = useRef(refreshTimeline)
+  refreshTimelineRef.current = refreshTimeline
+
   useEffect(() => {
     if (!isReviewOpen) return
     const interval = setInterval(() => {
-      refreshTimeline()
+      refreshTimelineRef.current()
     }, 30_000)
     return () => clearInterval(interval)
   }, [isReviewOpen])

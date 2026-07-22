@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, afterEach } from 'bun:test'
-import { render, fireEvent, cleanup, waitFor } from '@testing-library/preact'
+import { render, fireEvent, cleanup, waitFor, act } from '@testing-library/preact'
 import { App } from '../ui/App'
 import { makeGleamWithIntelligence } from './helpers'
 
@@ -114,5 +114,66 @@ describe('App — ReviewRoom detail selection', () => {
     await waitFor(() => expect(getAllByText('Latest insight about the new design')).toHaveLength(1))
     // And the detail should now be showing the older gleam's thought.
     expect(getAllByText('Older insight about the legacy system').length).toBeGreaterThan(1)
+  })
+})
+
+describe('App — periodic refresh honours the selected range', () => {
+  let setIntervalSpy: ReturnType<typeof vi.spyOn>
+  let clearIntervalSpy: ReturnType<typeof vi.spyOn>
+  const intervalCallbacks: Array<() => unknown> = []
+
+  afterEach(() => {
+    cleanup()
+    setIntervalSpy?.mockRestore()
+    clearIntervalSpy?.mockRestore()
+  })
+
+  test('selecting 近三十天 is not reverted to 近三天 by the periodic refresh', async () => {
+    intervalCallbacks.length = 0
+    setIntervalSpy = vi.spyOn(globalThis, 'setInterval').mockImplementation(((fn: any) => {
+      intervalCallbacks.push(fn as () => unknown)
+      return 1
+    }) as any)
+    clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval').mockImplementation(() => {})
+
+    const sync = makeFakeSync()
+    const repo = makeFakeRepo()
+    const shadowHost = document.createElement('div')
+    const { container } = render(
+      <App repository={repo} syncService={sync} shadowHost={shadowHost} />,
+    )
+
+    // The default range (近三天) is pushed up on mount and searched.
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(sync.search).toHaveBeenCalled()
+    const near3Query = sync.search.mock.calls[0][0] as string
+
+    // Opening the review room registers the periodic-refresh interval.
+    intervalCallbacks.length = 0
+    await act(async () => {
+      await openReview(container)
+    })
+    expect(intervalCallbacks.length).toBeGreaterThan(0)
+    const tick = intervalCallbacks[intervalCallbacks.length - 1]
+
+    // Switch the range to 近三十天.
+    const select = container.querySelector('select') as HTMLSelectElement
+    await act(async () => {
+      fireEvent.change(select, { target: { value: '近三十天' } })
+    })
+    const afterSelect = sync.search.mock.calls.at(-1)?.[0] as string
+    expect(afterSelect).not.toBe(near3Query)
+
+    // Simulate the periodic refresh firing.
+    await act(async () => {
+      await (tick() as Promise<void>)
+    })
+
+    // The periodic refresh must keep 近三十天 — NOT snap back to 近三天.
+    const lastQuery = sync.search.mock.calls.at(-1)?.[0] as string
+    expect(lastQuery).not.toBe(near3Query)
+    expect(lastQuery).toBe(afterSelect)
   })
 })
