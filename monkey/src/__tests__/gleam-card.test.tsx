@@ -92,4 +92,27 @@ describe('GleamCard', () => {
     expect(queryByText('react')).toBeNull()
     expect(queryByText('hooks')).toBeNull()
   })
+
+  // ── Index badge ──
+
+  test('renders the index badge when index is provided', () => {
+    const gleam = makeGleam({ thought: 'Numbered thought.' })
+    const { getByText } = render(<GleamCard gleam={gleam} onRevisit={() => {}} index={7} />)
+    expect(getByText('7')).toBeTruthy()
+  })
+
+  test('renders the index/total format when total is provided', () => {
+    const gleam = makeGleam({ thought: 'Numbered thought.' })
+    const { getByText } = render(
+      <GleamCard gleam={gleam} onRevisit={() => {}} index={3} total={12} />,
+    )
+    expect(getByText('3/12')).toBeTruthy()
+  })
+
+  test('does not render the index badge when index is omitted', () => {
+    const gleam = makeGleam({ thought: 'Unnumbered thought.' })
+    const { queryByText } = render(<GleamCard gleam={gleam} onRevisit={() => {}} />)
+    // No index prop → no sequence badge.
+    expect(queryByText('1')).toBeNull()
+  })
 })

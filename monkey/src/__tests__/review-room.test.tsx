@@ -54,13 +54,12 @@ describe('ReviewRoom', () => {
     const { getByPlaceholderText, getByText } = render(
       <ReviewRoom {...minimalProps({ onSearch })} />,
     )
-    // Type a custom query that yields no results.
-    fireEvent.input(
-      getByPlaceholderText(
-        '搜索：关键字 / tag:react / domain:github.com / type:book / after:2026-01-01 ...',
-      ),
-      { target: { value: 'zzz-nomatch' } },
+    // Type a custom query that yields no results, then press Enter to search.
+    const input = getByPlaceholderText(
+      '搜索：关键字 / tag:react / domain:github.com / type:book / after:2026-01-01 ...',
     )
+    fireEvent.input(input, { target: { value: 'zzz-nomatch' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
     await waitFor(() => expect(getByText('没有匹配的微光，试试这些查询：')).toBeTruthy())
     expect(getByText('#family')).toBeTruthy()
     expect(getByText('标签为 family 的微光')).toBeTruthy()
@@ -92,6 +91,32 @@ describe('ReviewRoom', () => {
     expect(getByText('Second insight.')).toBeTruthy()
   })
 
+  test('shows sequential index badges across all timeline groups', () => {
+    const groups: TimelineGroup[] = [
+      {
+        dateLabel: 'Day 1',
+        gleams: [
+          makeGleamWithIntelligence({ id: 'g1', thought: 'First insight.' }),
+          makeGleamWithIntelligence({ id: 'g2', thought: 'Second insight.' }),
+        ],
+      },
+      {
+        dateLabel: 'Day 2',
+        gleams: [
+          makeGleamWithIntelligence({ id: 'g3', thought: 'Third insight.' }),
+          makeGleamWithIntelligence({ id: 'g4', thought: 'Fourth insight.' }),
+        ],
+      },
+    ]
+    const { getByText } = render(<ReviewRoom {...minimalProps({ timelineGroups: groups })} />)
+    // Index badges follow render order across groups and show `index/total`:
+    // 1/4, 2/4 (Day 1) then 3/4, 4/4 (Day 2), total = 4 gleams.
+    expect(getByText('1/4')).toBeTruthy()
+    expect(getByText('2/4')).toBeTruthy()
+    expect(getByText('3/4')).toBeTruthy()
+    expect(getByText('4/4')).toBeTruthy()
+  })
+
   test('calls onSearch with the default range query on mount', async () => {
     const onSearch = vi.fn()
     render(<ReviewRoom {...minimalProps({ onSearch })} />)
@@ -101,18 +126,17 @@ describe('ReviewRoom', () => {
     expect(firstArg.startsWith('>=')).toBe(true)
   })
 
-  test('calls onSearch when the search input changes', async () => {
+  test('calls onSearch on Enter, not on input', async () => {
     const onSearch = vi.fn()
     const { getByPlaceholderText } = render(<ReviewRoom {...minimalProps({ onSearch })} />)
-    fireEvent.input(
-      getByPlaceholderText(
-        '搜索：关键字 / tag:react / domain:github.com / type:book / after:2026-01-01 ...',
-      ),
-      {
-        target: { value: 'react' },
-      },
+    const input = getByPlaceholderText(
+      '搜索：关键字 / tag:react / domain:github.com / type:book / after:2026-01-01 ...',
     )
-    // The internal useEffect calls onSearch after each state change.
+    // Typing alone must NOT trigger a search.
+    fireEvent.input(input, { target: { value: 'react' } })
+    expect(onSearch).not.toHaveBeenCalledWith('react')
+    // Enter commits the query and triggers the search.
+    fireEvent.keyDown(input, { key: 'Enter' })
     await waitFor(() => expect(onSearch).toHaveBeenCalledWith('react'))
   })
 

@@ -87,29 +87,50 @@ export function ReviewRoom({
   onOpenSettings,
 }: ReviewRoomProps) {
   const [range, setRange] = useState<RangeOption>('近三天')
-  const [searchQuery, setSearchQuery] = useState(() => rangeToQuery('近三天'))
+  const [committedQuery, setCommittedQuery] = useState(() => rangeToQuery('近三天'))
   const [relations, setRelations] = useState<GleamRelation[]>([])
   const [regenerating, setRegenerating] = useState<ArtifactType | null>(null)
+
+  // Total gleams currently matched — drives the SearchBar "匹配 N 条" hint.
+  const matchCount = timelineGroups.reduce((sum, g) => sum + g.gleams.length, 0)
+
+  // 1-based sequence number of each gleam within the whole result set, in
+  // render order (group → gleam). Drives the index badge on each GleamCard.
+  const gleamIndexById = new Map<string, number>()
+  {
+    let seq = 0
+    for (const group of timelineGroups) {
+      for (const item of group.gleams) {
+        gleamIndexById.set(item.gleam.id, ++seq)
+      }
+    }
+  }
 
   // A custom query (typed by the user) that matched nothing → show examples.
   // Preset ranges that match nothing still show the generic empty state.
   const showQueryExamples =
-    range === '自定义' && searchQuery.trim() !== '' && timelineGroups.length === 0
+    range === '自定义' && committedQuery.trim() !== '' && timelineGroups.length === 0
 
+  // Only the committed query triggers a backend search. Typing updates the
+  // local input (via SearchBar) but does NOT call onSearch — Enter does.
   useEffect(() => {
-    onSearch(searchQuery)
-  }, [searchQuery])
+    onSearch(committedQuery)
+  }, [committedQuery])
 
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value)
-    // 用户手动输入 → 视为自定义范围，不再套用预设时间筛选
+  const handleSearchChange = () => {
+    // Typing only marks the range as custom; the search itself is committed on Enter.
     setRange('自定义')
+  }
+
+  const handleSearchSubmit = (value: string) => {
+    setRange('自定义')
+    setCommittedQuery(value)
   }
 
   const handleRangeChange = (value: string) => {
     setRange(value as RangeOption)
-    // 自定义：保留用户当前输入；其余选项填入对应时间查询
-    setSearchQuery(value === '自定义' ? '' : rangeToQuery(value))
+    // Any range change triggers an immediate search (committed right away).
+    setCommittedQuery(value === '自定义' ? '' : rangeToQuery(value))
   }
 
   useEffect(() => {
@@ -155,14 +176,12 @@ export function ReviewRoom({
   const aiTagSet = new Set(viewingGleam?.intelligence.aiTags ?? [])
   // User-entered tags always precede AI tags; within each group, sort by usage count desc.
   const sortedTags = viewingGleam
-    ? viewingGleam.gleam.tags
-        .slice()
-        .sort((a, b) => {
-          const aAi = aiTagSet.has(a) ? 1 : 0
-          const bAi = aiTagSet.has(b) ? 1 : 0
-          if (aAi !== bAi) return aAi - bAi
-          return (countMap.get(b) ?? 0) - (countMap.get(a) ?? 0)
-        })
+    ? viewingGleam.gleam.tags.slice().sort((a, b) => {
+        const aAi = aiTagSet.has(a) ? 1 : 0
+        const bAi = aiTagSet.has(b) ? 1 : 0
+        if (aAi !== bAi) return aAi - bAi
+        return (countMap.get(b) ?? 0) - (countMap.get(a) ?? 0)
+      })
     : []
 
   // handleCardClick — ONLY opens the detail view.
@@ -215,7 +234,12 @@ export function ReviewRoom({
               ))}
             </RangeSelect>
             <SearchWrapper>
-              <SearchBar value={searchQuery} onChange={handleSearchChange} />
+              <SearchBar
+                value={committedQuery}
+                onChange={handleSearchChange}
+                onSubmit={handleSearchSubmit}
+                matchCount={matchCount}
+              />
             </SearchWrapper>
           </HeaderMiddle>
           <HeaderRight>
@@ -249,7 +273,10 @@ export function ReviewRoom({
                         <ExampleItem
                           key={ex.query}
                           type="button"
-                          onClick={() => setSearchQuery(ex.query)}
+                          onClick={() => {
+                            setRange('自定义')
+                            setCommittedQuery(ex.query)
+                          }}
                           title={`填入查询：${ex.query}`}
                         >
                           <ExampleQuery>{ex.query}</ExampleQuery>
@@ -289,6 +316,8 @@ export function ReviewRoom({
                             onClick={() => handleCardClick(item)}
                             selected={viewingGleam?.gleam.id === item.gleam.id}
                             highlight={highlights[item.gleam.id] ?? null}
+                            index={gleamIndexById.get(item.gleam.id)}
+                            total={matchCount}
                           />
                         ))}
                       </GleamList>
@@ -766,13 +795,13 @@ const ExampleLabel = styled.span`
 const TimelineList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 `
 
 const TimelineGroupSection = styled.section`
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 `
 
 const GroupHeader = styled.div`
@@ -798,7 +827,7 @@ const GroupDateLabel = styled.span`
 const GleamList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 `
 
 const DetailPlaceholder = styled.div`

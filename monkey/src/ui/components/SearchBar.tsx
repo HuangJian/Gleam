@@ -1,9 +1,16 @@
+import { useEffect, useState } from 'preact/hooks'
 import styled from '@emotion/styled'
 import { theme } from '../theme'
 
 interface SearchBarProps {
+  /** The committed (searched) query — SearchBar syncs its input to this when it changes externally. */
   value: string
+  /** Fired on every keystroke. Updates local input only; does NOT trigger a search. */
   onChange: (value: string) => void
+  /** Fired on Enter (or Clear). Commits the query and triggers a search. */
+  onSubmit: (value: string) => void
+  /** Number of gleams matched by the current query, shown in the hint after a search. */
+  matchCount?: number | null
 }
 
 /** Curated example queries shown when a search yields nothing. Keep in sync
@@ -21,7 +28,42 @@ export const EXAMPLE_QUERIES: { query: string; label: string }[] = [
   { query: '~2026Q3', label: '2026 年第三季度的微光' },
 ]
 
-export function SearchBar({ value, onChange }: SearchBarProps) {
+export function SearchBar({ value, onChange, onSubmit, matchCount }: SearchBarProps) {
+  // The input keeps its own draft so typing never reaches the backend. The
+  // `value` prop only overwrites the draft when it changes externally — i.e.
+  // when a range preset fills the box or a search commits.
+  const [draft, setDraft] = useState(value)
+  const [dirty, setDirty] = useState(false)
+
+  useEffect(() => {
+    setDraft(value)
+    setDirty(false)
+  }, [value])
+
+  const handleInput = (e: Event) => {
+    const next = (e.target as HTMLInputElement).value
+    setDraft(next)
+    setDirty(true)
+    onChange(next)
+  }
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    // Don't let global shortcuts fire while typing in the search box.
+    e.stopPropagation()
+    if (e.key !== 'Enter') return
+    setDirty(false)
+    onSubmit(draft)
+  }
+
+  const handleClear = () => {
+    setDraft('')
+    setDirty(false)
+    // Clearing is a deliberate action → submit an empty query immediately.
+    onSubmit('')
+  }
+
+  const hint = dirty ? '按回车检索' : matchCount != null ? `匹配 ${matchCount} 条` : ''
+
   return (
     <SearchContainer>
       <SearchIcon viewBox="0 0 24 24">
@@ -30,13 +72,15 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
       <StyledInput
         type="text"
         placeholder="搜索：关键字 / tag:react / domain:github.com / type:book / after:2026-01-01 ..."
-        value={value}
-        onInput={(e: any) => onChange((e.target as HTMLInputElement).value)}
-        onKeyDown={(e: KeyboardEvent) => e.stopPropagation()}
+        value={draft}
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
       />
 
-      {value && (
-        <ClearButton onClick={() => onChange('')} title="清除搜索">
+      {hint && <HintLabel $dirty={dirty}>{hint}</HintLabel>}
+
+      {draft && (
+        <ClearButton onClick={handleClear} title="清除搜索">
           &times;
         </ClearButton>
       )}
@@ -81,6 +125,16 @@ const StyledInput = styled.input`
   &::placeholder {
     color: ${theme.colors.text.muted};
   }
+`
+
+const HintLabel = styled.span<{ $dirty: boolean }>`
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
+  color: ${(p) => (p.$dirty ? theme.colors.text.accent : theme.colors.text.muted)};
+  opacity: ${(p) => (p.$dirty ? 0.9 : 0.7)};
 `
 
 const ClearButton = styled.button`

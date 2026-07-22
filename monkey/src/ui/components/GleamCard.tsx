@@ -12,6 +12,10 @@ interface GleamCardProps {
   onClick?: (gleam: Gleam) => void
   selected?: boolean
   highlight?: string | null
+  /** 1-based position of this gleam within the current search result set. */
+  index?: number
+  /** Total number of gleams in the current result set (for `index/total`). */
+  total?: number
 }
 
 export function GleamCard({
@@ -21,6 +25,8 @@ export function GleamCard({
   onClick,
   selected = false,
   highlight = null,
+  index,
+  total,
 }: GleamCardProps) {
   const handleCardClick = () => {
     onRevisit(gleam.id)
@@ -31,6 +37,8 @@ export function GleamCard({
 
   return (
     <Card $selected={selected} onClick={handleCardClick}>
+      {index != null && <IndexBadge>{total != null ? `${index}/${total}` : index}</IndexBadge>}
+
       {summary && (
         <CardHeader>
           <AIPrefix>✦</AIPrefix>
@@ -53,10 +61,10 @@ const Card = styled.div<{ $selected: boolean }>`
   background: ${(p) => (p.$selected ? 'rgba(255, 253, 248, 1)' : theme.colors.bg.card)};
   border: 1px solid ${(p) => (p.$selected ? theme.colors.border.focus : theme.colors.border.card)};
   border-radius: 12px;
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   cursor: pointer;
   transition: ${theme.animations.transition};
   position: relative;
@@ -79,6 +87,27 @@ const Card = styled.div<{ $selected: boolean }>`
     background: ${theme.colors.brand.primary};
     opacity: ${(p) => (p.$selected ? 1 : 0.8)};
   }
+`
+
+const IndexBadge = styled.span`
+  position: absolute;
+  bottom: 0px;
+  right: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  color: ${theme.colors.text.muted};
+  background: rgba(200, 180, 140, 0.12);
+  border: 1px solid ${theme.colors.border.card};
+  border-radius: 50%;
+  z-index: 1;
 `
 
 const CardHeader = styled.div`
