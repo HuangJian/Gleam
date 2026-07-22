@@ -3,6 +3,7 @@ import styled from '@emotion/styled'
 import { theme } from '../theme'
 import { METEOR_ICON_URL } from '../assets'
 import { loadFabPosition, saveFabPosition, clearFabPosition } from '../../infra/gm-storage'
+import { useImmersiveVideo } from '../immersive-video'
 
 const FAB_SIZE = 48
 const FAB_MARGIN = 24
@@ -74,6 +75,11 @@ interface ReviewFABProps {
 }
 
 export function ReviewFAB({ onClick }: ReviewFABProps) {
+  // Hide entirely while the page is in "web fullscreen" (网页全屏) so the
+  // button doesn't float over the video. It stays in the DOM (display:none)
+  // so the Tampermonkey menu command can still click it to open the review.
+  const immersive = useImmersiveVideo()
+
   const [pos, setPos] = useState<FabPos>(() => {
     const vp = { width: window.innerWidth, height: window.innerHeight }
     const saved = loadFabPosition(location.hostname)
@@ -164,11 +170,13 @@ export function ReviewFAB({ onClick }: ReviewFABProps) {
       type="button"
       title="打开拾光 · 全屏回顾（可拖动到任意边缘）"
       aria-label="打开拾光 · 全屏回顾"
+      aria-hidden={immersive || undefined}
       style={{
         left: `${pos.x}px`,
         top: `${pos.y}px`,
         cursor: dragging ? 'grabbing' : 'grab',
         transition: dragging ? 'none' : theme.animations.spring,
+        ...(immersive ? { display: 'none', pointerEvents: 'none' as const } : {}),
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
