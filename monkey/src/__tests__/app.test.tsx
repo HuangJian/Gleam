@@ -86,6 +86,14 @@ async function openReview(container: Element) {
   fireEvent.pointerUp(fab, { pointerId: 1, clientX: 10, clientY: 10 })
 }
 
+// Open the capture panel via the global Ctrl+Shift+G shortcut.
+function openCaptureViaShortcut() {
+  fireEvent(
+    window,
+    new KeyboardEvent('keydown', { key: 'g', ctrlKey: true, shiftKey: true, bubbles: true }),
+  )
+}
+
 describe('App — ReviewRoom detail selection', () => {
   afterEach(cleanup)
 
@@ -175,5 +183,61 @@ describe('App — periodic refresh honours the selected range', () => {
     const lastQuery = sync.search.mock.calls.at(-1)?.[0] as string
     expect(lastQuery).not.toBe(near3Query)
     expect(lastQuery).toBe(afterSelect)
+  })
+})
+
+describe('App — capture save does not block on an unreachable server', () => {
+  afterEach(cleanup)
+
+  test('capture panel closes promptly even when the server is unreachable', async () => {
+    // Simulate an unreachable / hanging server: both server-backed read paths
+    // (getTimeline + search) return a promise that never resolves on its own.
+    // refreshTimeline() takes the search path once ReviewRoom mounts its
+    // default "近三天" range, so search MUST hang to reproduce the bug; we hang
+    // getTimeline too for robustness. We resolve the deferred at the end so the
+    // dangling background promises don't leak.
+    let resolveReads!: () => void
+    const pending = new Promise<never>(() => {}) as Promise<never>
+    const release = new Promise<void>((resolve) => {
+      resolveReads = resolve
+    })
+    // Tie resolution of the read mocks to `release`.
+    const hanging = ((): Promise<never> => pending) as unknown as () => Promise<unknown>
+
+    const sync = makeFakeSync()
+    sync.getTimeline = vi.fn().mockReturnValue(hanging())
+    sync.search = vi.fn().mockReturnValue(hanging())
+    const repo = makeFakeRepo()
+    const shadowHost = document.createElement('div')
+    const { getByPlaceholderText, getByText, queryByPlaceholderText } = render(
+      <App repository={repo} syncService={sync} shadowHost={shadowHost} />,
+    )
+
+    // Open the capture panel via the global shortcut.
+    await act(async () => {
+      openCaptureViaShortcut()
+    })
+    const textarea = await waitFor(() => getByPlaceholderText(/写下你此刻真实的理解/))
+    fireEvent.input(textarea, { target: { value: 'A quick gleam.' } })
+
+    // Save. With the bug, handleSaveCapture awaits refreshTimeline() which
+    // awaits the never-resolving server read — the panel stays in "保存中..."
+    // and never closes. With the fix, the panel closes immediately and
+    // refreshTimeline runs in the background.
+    fireEvent.click(getByText('拾取'))
+
+    await waitFor(
+      () => {
+        // Panel is gone once the textarea placeholder disappears.
+        expect(queryByPlaceholderText(/写下你此刻真实的理解/)).toBeNull()
+      },
+      { timeout: 1000 },
+    )
+
+    // The background refresh was kicked off but the panel did not wait for it.
+    expect(sync.search).toHaveBeenCalled()
+    // Release the dangling promises so the test exits cleanly.
+    resolveReads()
+    void release
   })
 })

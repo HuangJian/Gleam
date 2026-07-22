@@ -142,13 +142,20 @@ export function App({ repository, syncService, shadowHost }: AppProps) {
     )
     // Trigger async upload to server (non-blocking — falls back to local on failure)
     await syncService.onGleamCaptured()
-    await refreshTimeline()
+
+    // Close the panel immediately. The captured gleam already lives in the
+    // local cache, so refreshTimeline() can run in the background: it will
+    // pick up the new gleam from the remote timeline (if reachable) or fall
+    // back to local — either way without making the user wait on a
+    // possibly-unreachable server. Awaiting refreshTimeline() here previously
+    // blocked the panel close for seconds when the server was down.
     setIsCaptureOpen(false)
     setActiveExcerptText('')
     setActiveExcerptHtml('')
     setActiveExcerptFullHtml(null)
     setActiveExcerptFullTag(null)
     setActiveMedia(undefined)
+    void refreshTimeline()
   }
 
   const handleAddGleam = () => {
